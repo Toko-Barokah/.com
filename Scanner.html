@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner UD. BAROKAH</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #1a1a1a; color: white; height: 100vh; display: flex; flex-direction: column; }
+        #reader { width: 100%; max-width: 500px; margin: auto; border: 2px solid #0d6efd; border-radius: 15px; overflow: hidden; }
+        .info { padding: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h4 class="fw-bold">SCAN BARCODE</h4>
+        <p class="small text-secondary">Pastikan izin kamera diizinkan</p>
+    </div>
+
+    <div id="reader"></div>
+
+    <div class="p-3">
+        <button class="btn btn-outline-light w-100" onclick="goBack()">KEMBALI</button>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const returnUrl = decodeURIComponent(urlParams.get('return'));
+
+        const html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+
+        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+            // Bunyi Beep (Opsional)
+            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
+            audio.play();
+
+            // Kirim balik ke Google Script Kasir
+            window.location.href = returnUrl + "&scan=" + encodeURIComponent(decodedText);
+        });
+
+        function goBack() {
+            window.location.href = returnUrl;
+        }
+    </script>
+</body>
+</html>
