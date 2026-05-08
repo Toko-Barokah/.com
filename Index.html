@@ -26,22 +26,56 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const returnUrl = decodeURIComponent(urlParams.get('return'));
+        const returnUrl = decodeURIComponent(urlParams.get('return') || '');
+
+        // Validasi URL return
+        if (!returnUrl) {
+            alert('Error: Parameter "return" tidak ditemukan di URL');
+            throw new Error('Missing return URL parameter');
+        }
 
         const html5QrCode = new Html5Qrcode("reader");
         const config = { fps: 10, qrbox: { width: 250, height: 150 } };
 
-        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-            // Bunyi Beep (Opsional)
-            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
-            audio.play();
+        html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText) => {
+                // Bunyi Beep menggunakan Web Audio API
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                } catch (err) {
+                    console.warn('Audio gagal:', err);
+                }
 
-            // Kirim balik ke Google Script Kasir
-            window.location.href = returnUrl + "&scan=" + encodeURIComponent(decodedText);
+                // Kirim balik ke Google Script Kasir
+                window.location.href = returnUrl + "&scan=" + encodeURIComponent(decodedText);
+            }
+        ).catch((err) => {
+            alert('Error kamera: ' + err);
+            console.error(err);
         });
 
         function goBack() {
-            window.location.href = returnUrl;
+            if (returnUrl) {
+                window.location.href = returnUrl;
+            } else {
+                window.history.back();
+            }
         }
     </script>
 </body>
