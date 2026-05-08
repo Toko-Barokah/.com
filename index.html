@@ -26,31 +26,38 @@
 
     <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const returnUrl = urlParams.get('return'); // Mengambil URL asal (Google Script)
+    const returnParam = urlParams.get('return');
+    
+    // Pengaman: Jika tidak ada return URL, balikkan ke halaman utama Kasir Anda
+    const returnUrl = returnParam ? decodeURIComponent(returnParam) : "https://script.google.com/macros/s/AKfycbyKcI5QQVheT_o0Xrx-IFnCOso1ULf4L-06OaB-9PdTR4GKwA1PAijy5Y764I82J5Wz/exec";
 
     const html5QrCode = new Html5Qrcode("reader");
     const config = { fps: 10, qrbox: { width: 250, height: 150 } };
 
     html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-        const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
-        audio.play().catch(() => {}); // Hindari error jika browser memblokir audio
+        // Efek suara
+        try {
+            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
+            audio.play();
+        } catch (e) { console.log("Audio block by browser"); }
 
-        if (returnUrl) {
-            // Pastikan URL kembali menggunakan format yang benar (? atau &)
-            const separator = returnUrl.includes('?') ? '&' : '?';
-            window.location.href = decodeURIComponent(returnUrl) + separator + "scan=" + encodeURIComponent(decodedText);
-        } else {
-            alert("Hasil Scan: " + decodedText + "\n(Link kembali ke Kasir tidak ditemukan)");
-        }
+        // Jeda 500ms agar user sempat dengar Beep, lalu kirim data
+        setTimeout(() => {
+            if (returnUrl.includes("?")) {
+                window.location.href = returnUrl + "&scan=" + encodeURIComponent(decodedText);
+            } else {
+                window.location.href = returnUrl + "?scan=" + encodeURIComponent(decodedText);
+            }
+        }, 500);
+    }).catch(err => {
+        console.error("Gagal start kamera", err);
+        alert("Kamera tidak diizinkan atau tidak ditemukan.");
     });
 
     function goBack() {
-        if (returnUrl) {
-            window.location.href = decodeURIComponent(returnUrl);
-        } else {
-            alert("Tidak ada alamat kembali.");
-        }
+        window.location.href = returnUrl;
     }
-    </script>
+</script>
+
 </body>
 </html>
