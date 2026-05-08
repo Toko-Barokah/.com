@@ -26,38 +26,44 @@
 
     <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const returnParam = urlParams.get('return');
+    let returnParam = urlParams.get('return');
     
-    // Pengaman: Jika tidak ada return URL, balikkan ke halaman utama Kasir Anda
-    const returnUrl = returnParam ? decodeURIComponent(returnParam) : "https://script.google.com/macros/s/AKfycbyKcI5QQVheT_o0Xrx-IFnCOso1ULf4L-06OaB-9PdTR4GKwA1PAijy5Y764I82J5Wz/exec";
+    // --- PERBAIKAN KRUSIAL DI SINI ---
+    // Jika returnParam berisi link internal Google yang "ngaco" (ada tulisan 'userCodeAppPanel'), 
+    // kita paksa balik ke link publik Toko Barokah.
+    const OFFICIAL_URL = "https://script.google.com/macros/s/AKfycbyKcI5QQVheT_o0Xrx-IFnCOso1ULf4L-06OaB-9PdTR4GKwA1PAijy5Y764I82J5Wz/exec";
+
+    let returnUrl = returnParam ? decodeURIComponent(returnParam) : OFFICIAL_URL;
+
+    // Jika link yang terdeteksi adalah link 'ngeblank' tadi, timpa dengan yang benar
+    if (returnUrl.includes("googleusercontent.com")) {
+        returnUrl = OFFICIAL_URL;
+    }
 
     const html5QrCode = new Html5Qrcode("reader");
     const config = { fps: 10, qrbox: { width: 250, height: 150 } };
 
     html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-        // Efek suara
+        // Bunyi Beep
         try {
-            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
-            audio.play();
-        } catch (e) { console.log("Audio block by browser"); }
+            new Audio('https://www.soundjay.com/buttons/beep-07.mp3').play();
+        } catch (e) {}
 
-        // Jeda 500ms agar user sempat dengar Beep, lalu kirim data
         setTimeout(() => {
-            if (returnUrl.includes("?")) {
-                window.location.href = returnUrl + "&scan=" + encodeURIComponent(decodedText);
-            } else {
-                window.location.href = returnUrl + "?scan=" + encodeURIComponent(decodedText);
-            }
+            // Gunakan URLSearchParams agar penggabungan link lebih rapi dan tidak error
+            const finalPath = new URL(returnUrl);
+            finalPath.searchParams.set('scan', decodedText);
+            
+            // Perintah sakti: window.top.location mematikan proteksi iframe Google
+            window.top.location.href = finalPath.toString();
         }, 500);
     }).catch(err => {
-        console.error("Gagal start kamera", err);
-        alert("Kamera tidak diizinkan atau tidak ditemukan.");
+        alert("Kamera Error: Pastikan izin kamera aktif!");
     });
 
     function goBack() {
-        window.location.href = returnUrl;
+        window.top.location.href = returnUrl;
     }
-</script>
-
+    </script>
 </body>
 </html>
