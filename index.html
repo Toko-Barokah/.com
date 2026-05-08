@@ -25,24 +25,32 @@
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const returnUrl = decodeURIComponent(urlParams.get('return'));
+    const urlParams = new URLSearchParams(window.location.search);
+    const returnUrl = urlParams.get('return'); // Mengambil URL asal (Google Script)
 
-        const html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+    const html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 250, height: 150 } };
 
-        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-            // Bunyi Beep (Opsional)
-            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
-            audio.play();
+    html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+        const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
+        audio.play().catch(() => {}); // Hindari error jika browser memblokir audio
 
-            // Kirim balik ke Google Script Kasir
-            window.location.href = returnUrl + "&scan=" + encodeURIComponent(decodedText);
-        });
-
-        function goBack() {
-            window.location.href = returnUrl;
+        if (returnUrl) {
+            // Pastikan URL kembali menggunakan format yang benar (? atau &)
+            const separator = returnUrl.includes('?') ? '&' : '?';
+            window.location.href = decodeURIComponent(returnUrl) + separator + "scan=" + encodeURIComponent(decodedText);
+        } else {
+            alert("Hasil Scan: " + decodedText + "\n(Link kembali ke Kasir tidak ditemukan)");
         }
+    });
+
+    function goBack() {
+        if (returnUrl) {
+            window.location.href = decodeURIComponent(returnUrl);
+        } else {
+            alert("Tidak ada alamat kembali.");
+        }
+    }
     </script>
 </body>
 </html>
