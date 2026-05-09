@@ -1048,59 +1048,63 @@ async function processManualInput() {
 let html5QrCode;
 
 async function openScanner() {
-  const container = document.getElementById('scannerContainer');
-  container.style.display = 'block';
-  container.scrollIntoView({ behavior: 'smooth' });
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const urlParams = new URLSearchParams(window.location.search);
+  const isRemoteMode = urlParams.get('remote') === 'true';
 
-  if (html5QrCode) {
-    try { await html5QrCode.stop(); } catch (e) { }
-  }
+  if (isMobile) {
+    // --- MODE HP: Membuka Kamera ---
+    const container = document.getElementById('scannerContainer');
+    container.style.display = 'block';
+    container.scrollIntoView({ behavior: 'smooth' });
 
-  // Gunakan ID "reader" sesuai div Anda
-  html5QrCode = new Html5Qrcode("reader");
+    if (html5QrCode) { try { await html5QrCode.stop(); } catch (e) { } }
+    html5QrCode = new Html5Qrcode("reader");
 
-  const qrConfig = { 
-    fps: 10, 
-    qrbox: { width: 250, height: 150 }
-  };
+    html5QrCode.start(
+      { facingMode: "environment" }, 
+      { fps: 10, qrbox: { width: 250, height: 150 } },
+      (decodedText) => {
+        if (isRemoteMode) {
+          // Jika HP membuka link remote, kirim hasil ke laptop via backend
+          sendScanResultToBackend(decodedText);
+        } else {
+          // Jika HP digunakan langsung (stand-alone)
+          handleScanSuccess(decodedText);
+        }
+      }
+    ).catch(err => alert("Kamera Error: " + err));
 
-  // Langsung panggil kamera belakang tanpa getCameras()
-  html5QrCode.start(
-    { facingMode: "environment" }, 
-    qrConfig,
-    (decodedText) => {
-      handleScanSuccess(decodedText);
-    },
-    (errorMessage) => { 
-      // Abaikan error saat proses scanning
+  } else {
+    // --- MODE LAPTOP: Tampilkan Instruksi & Mulai Listening ---
+    const remoteUrl = window.location.href.split('?')[0] + "?remote=true";
+    
+    // Tampilkan pesan instruksi (Bisa diganti dengan Modal agar lebih cantik)
+    const confirmScan = confirm("Gunakan HP Anda untuk scan?\n\n1. Buka link ini di HP: " + remoteUrl + "\n2. Klik 'OK' di laptop ini untuk mulai menunggu hasil scan.");
+    
+    if (confirmScan) {
+      alert("Laptop sekarang menunggu scan dari HP... Silakan scan barcode di HP Anda.");
+      startListeningRemoteScan();
     }
-  ).catch(err => {
-    alert("Kamera gagal dibuka. Pastikan Anda menggunakan HTTPS/URL Exec dan sudah mengizinkan kamera di browser. Error: " + err);
-  });
+  }
 }
 
 function handleScanSuccess(decodedText) {
-  // Masukkan hasil ke search input
   const searchInput = document.getElementById('searchInput');
-  searchInput.value = decodedText;
+  if(searchInput) searchInput.value = decodedText;
   
-  // Tutup scanner
   closeScanner();
   
-  // Cari produk berdasarkan ID Variasi
   const matchedProduct = products.find(p => {
     const ids = p.id_variasi ? p.id_variasi.toString().split(',').map(id => id.trim()) : [];
     return ids.includes(decodedText) || p.id === decodedText;
   });
 
   if (matchedProduct) {
-    // Jika ketemu, buka modal variasi atau langsung tambahkan
     handleAddToCart(matchedProduct.id || matchedProduct.nama);
-    // Jika variasi banyak, seleksi otomatis variasi yang sesuai ID-nya
     setTimeout(() => autoSelectVariation(decodedText), 500);
   } else {
     alert("Produk tidak ditemukan: " + decodedText);
-    filterProducts(); // Tetap jalankan filter biasa
   }
 }
 
@@ -1215,6 +1219,40 @@ function filterDelivery(status, btn) {
   );
   
   renderDeliveryList(filtered);
+}
+
+// HP mengirim hasil scan ke Server
+async function sendScanResultToBackend(code) {
+  showLoading(true);
+  try {
+    const payload = { 
+      action: "postRemoteScan", 
+      code: code, 
+      user: "admin" // Pastikan user sama antara HP & Laptop
+    };
+    await fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) });
+    alert("Berhasil Scan: " + code + ". Data terkirim ke Laptop.");
+  } catch (e) { alert("Gagal kirim data"); }
+  showLoading(false);
+}
+
+// Laptop mengecek hasil scan dari Server secara berkala
+function startListeningRemoteScan() {
+  const interval = setInterval(async () => {
+    try {
+      const resp = await fetch(WEB_APP_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "getRemoteScan", user: "admin" })
+      });
+      const res = await resp.json();
+      
+      if (res.code) {
+        handleScanSuccess(res.code); // Masukkan ke keranjang laptop
+        clearInterval(interval);    // Berhenti mengecek setelah ketemu
+        alert("Produk Berhasil Masuk!");
+      }
+    } catch (e) { console.error("Waiting..."); }
+  }, 3000); // Cek setiap 3 detik
 }
 
 </script>
