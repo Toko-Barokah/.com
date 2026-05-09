@@ -168,25 +168,7 @@
     <div id="searchSuggestion" class="list-group position-absolute shadow-sm" style="z-index: 1050; width: 85%;"></div>
   </div>
 
-  <div id="manualRowsContainer">
-    <div class="row g-1 mb-2 align-items-end manual-row">
-      <div class="col-4">
-        <label class="xs-font fw-bold">Variasi</label>
-        <input type="text" class="form-control form-control-sm man-variasi" placeholder="Pcs/Kg">
-      </div>
-      <div class="col-4">
-        <label class="xs-font fw-bold">Harga</label>
-        <input type="number" class="form-control form-control-sm man-harga" placeholder="Rp">
-      </div>
-      <div class="col-3">
-        <label class="xs-font fw-bold">Stok</label>
-        <input type="number" class="form-control form-control-sm man-stok" placeholder="0">
-      </div>
-      <div class="col-1 text-end">
-        <button class="btn btn-sm text-danger p-0" onclick="removeManualRow(this)"><span class="material-icons" style="font-size:18px">remove_circle</span></button>
-      </div>
-    </div>
-  </div>
+  <div id="manualRowsContainer"></div>
 
   <button class="btn btn-outline-secondary btn-sm w-100 mb-3" onclick="addManualRow()">
     <span class="material-icons align-middle" style="font-size:14px">add</span> Tambah Baris Variasi
@@ -933,16 +915,35 @@ function fillManualForm(productName) {
   });
 }
 
-// --- FUNGSI MANIPULASI BARIS ---
+// Tambahkan di dalam window.onload
+window.onload = () => {
+  fetchProducts();
+  addManualRow(); // Memunculkan baris pertama otomatis saat start
+};
+
 function addManualRow(v = "", h = "", s = "") {
   const container = document.getElementById('manualRowsContainer');
   const div = document.createElement('div');
-  div.className = "row g-1 mb-2 align-items-end manual-row";
+  div.className = "row g-1 mb-2 align-items-center manual-row"; // Ubah ke align-items-center
+  
   div.innerHTML = `
-    <div class="col-4"><input type="text" class="form-control form-control-sm man-variasi" value="${v}" placeholder="Variasi"></div>
-    <div class="col-4"><input type="number" class="form-control form-control-sm man-harga" value="${h}" placeholder="Harga"></div>
-    <div class="col-3"><input type="number" class="form-control form-control-sm man-stok" value="${s}" placeholder="Stok"></div>
-    <div class="col-1 text-end"><button class="btn btn-sm text-danger p-0" onclick="removeManualRow(this)"><span class="material-icons" style="font-size:18px">remove_circle</span></button></div>
+    <div class="col-1 text-center">
+      <input type="checkbox" class="form-check-input man-check" checked>
+    </div>
+    <div class="col-4">
+      <input type="text" class="form-control form-control-sm man-variasi" value="${v}" placeholder="Pcs/Kg">
+    </div>
+    <div class="col-3">
+      <input type="number" class="form-control form-control-sm man-harga" value="${h}" placeholder="Rp">
+    </div>
+    <div class="col-3">
+      <input type="number" class="form-control form-control-sm man-stok" value="${s}" placeholder="0">
+    </div>
+    <div class="col-1 text-end">
+      <button class="btn btn-sm text-danger p-0" onclick="removeManualRow(this)">
+        <span class="material-icons" style="font-size:18px">remove_circle</span>
+      </button>
+    </div>
   `;
   container.appendChild(div);
 }
@@ -967,78 +968,74 @@ async function processManualInput() {
   let inputVariasi = [], inputHarga = [], inputStok = [], inputVarIDs = [];
   let itemsToCart = [];
 
-  // Cari apakah produk sudah ada di database lokal (products)
   const existingProd = products.find(p => p.nama.toLowerCase() === nama.toLowerCase());
-  
-  // Tentukan ID Produk (Gunakan yang lama jika ada, buat baru jika tidak ada)
   const finalProdId = (existingProd && existingProd.id) ? existingProd.id : generateShortID("BRK");
 
   rows.forEach(row => {
+    const isChecked = row.querySelector('.man-check').checked;
     const v = row.querySelector('.man-variasi').value.trim() || "-";
     const h = parseFloat(row.querySelector('.man-harga').value) || 0;
     const s = parseInt(row.querySelector('.man-stok').value) || 0;
     
-    // Generate ID Variasi baru untuk setiap baris
+    // Gunakan ID variasi yang sudah ada jika update, atau buat baru
     const vId = generateShortID("V");
 
+    // Tetap masukkan ke array database (Sheet) tanpa peduli ceklis
     inputVariasi.push(v);
     inputHarga.push(h);
     inputStok.push(s);
     inputVarIDs.push(vId);
     
-    itemsToCart.push({ 
-      id: finalProdId, // Sertakan ID Produk
-      nama: nama, 
-      variasi: v, 
-      harga: h, 
-      qty: 1, 
-      diskon: 0 
-    });
-  });
-
-  // LOGIKA SYNC: Kirim ke backend jika produk baru atau ada perubahan
-  let needsSync = false;
-  if (!existingProd) {
-    needsSync = true;
-  } else {
-    // Cek jika jumlah variasi atau isi variasi berbeda
-    if (existingProd.variasi !== inputVariasi.join(', ') || 
-        existingProd.harga.toString() !== inputHarga.join(', ')) {
-      needsSync = true;
+    // HANYA masukkan ke keranjang jika diceklis
+    if (isChecked) {
+      itemsToCart.push({ 
+        id: finalProdId,
+        nama: nama, 
+        variasi: v, 
+        harga: h, 
+        qty: 1, 
+        diskon: 0 
+      });
     }
-  }
-
-  if (needsSync) {
-    showLoading(true);
-    try {
-      const payload = {
-        action: "syncProductManual", 
-        data: {
-          id: finalProdId, // ID Produk dikirim
-          nama: nama,
-          harga: inputHarga.join(', '),
-          variasi: inputVariasi.join(', '),
-          stok: inputStok.join(', '),
-          id_variasi: inputVarIDs.join(', ') // ID Variasi dikirim (sinkron manajemen)
-        }
-      };
-      const resp = await fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) });
-      const res = await resp.json();
-      if (res.status === "success") fetchProducts(); 
-    } catch (e) { console.error("Sync gagal", e); }
-    showLoading(false);
-  }
-
-  // Masukkan ke keranjang
-  itemsToCart.forEach(item => {
-    const existsInCart = cart.find(c => c.nama === item.nama && c.variasi === item.variasi);
-    if (existsInCart) existsInCart.qty++;
-    else cart.push(item);
   });
 
-  renderCart();
-  alert("Produk Berhasil Diproses (ID: " + finalProdId + ")");
-  
+  if (inputVariasi.length === 0) return alert("Tambahkan minimal satu variasi!");
+
+  // PROSES UPDATE DATABASE (Sama seperti sebelumnya, mengirim semua data input)
+  showLoading(true);
+  try {
+    const payload = {
+      action: "syncProductManual", 
+      data: {
+        id: finalProdId,
+        nama: nama,
+        harga: inputHarga.join(', '),
+        variasi: inputVariasi.join(', '),
+        stok: inputStok.join(', '),
+        id_variasi: inputVarIDs.join(', ')
+      }
+    };
+    const resp = await fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) });
+    const res = await resp.json();
+    if (res.status === "success") fetchProducts(); 
+  } catch (e) { 
+    console.error("Sync gagal", e); 
+  }
+  showLoading(false);
+
+  // MASUKKAN DATA CEKLIS KE KERANJANG
+  if (itemsToCart.length > 0) {
+    itemsToCart.forEach(item => {
+      const existsInCart = cart.find(c => c.nama === item.nama && c.variasi === item.variasi);
+      if (existsInCart) existsInCart.qty++;
+      else cart.push(item);
+    });
+    renderCart();
+    alert("Berhasil: " + itemsToCart.length + " item masuk keranjang & database diperbarui.");
+  } else {
+    alert("Database diperbarui, namun tidak ada item yang masuk keranjang (tidak ada yang diceklis).");
+  }
+
   // Reset form
   document.getElementById('manNama').value = "";
   document.getElementById('manualRowsContainer').innerHTML = "";
@@ -1048,63 +1045,59 @@ async function processManualInput() {
 let html5QrCode;
 
 async function openScanner() {
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const urlParams = new URLSearchParams(window.location.search);
-  const isRemoteMode = urlParams.get('remote') === 'true';
+  const container = document.getElementById('scannerContainer');
+  container.style.display = 'block';
+  container.scrollIntoView({ behavior: 'smooth' });
 
-  if (isMobile) {
-    // --- MODE HP: Membuka Kamera ---
-    const container = document.getElementById('scannerContainer');
-    container.style.display = 'block';
-    container.scrollIntoView({ behavior: 'smooth' });
-
-    if (html5QrCode) { try { await html5QrCode.stop(); } catch (e) { } }
-    html5QrCode = new Html5Qrcode("reader");
-
-    html5QrCode.start(
-      { facingMode: "environment" }, 
-      { fps: 10, qrbox: { width: 250, height: 150 } },
-      (decodedText) => {
-        if (isRemoteMode) {
-          // Jika HP membuka link remote, kirim hasil ke laptop via backend
-          sendScanResultToBackend(decodedText);
-        } else {
-          // Jika HP digunakan langsung (stand-alone)
-          handleScanSuccess(decodedText);
-        }
-      }
-    ).catch(err => alert("Kamera Error: " + err));
-
-  } else {
-    // --- MODE LAPTOP: Tampilkan Instruksi & Mulai Listening ---
-    const remoteUrl = window.location.href.split('?')[0] + "?remote=true";
-    
-    // Tampilkan pesan instruksi (Bisa diganti dengan Modal agar lebih cantik)
-    const confirmScan = confirm("Gunakan HP Anda untuk scan?\n\n1. Buka link ini di HP: " + remoteUrl + "\n2. Klik 'OK' di laptop ini untuk mulai menunggu hasil scan.");
-    
-    if (confirmScan) {
-      alert("Laptop sekarang menunggu scan dari HP... Silakan scan barcode di HP Anda.");
-      startListeningRemoteScan();
-    }
+  if (html5QrCode) {
+    try { await html5QrCode.stop(); } catch (e) { }
   }
+
+  // Gunakan ID "reader" sesuai div Anda
+  html5QrCode = new Html5Qrcode("reader");
+
+  const qrConfig = { 
+    fps: 10, 
+    qrbox: { width: 250, height: 150 }
+  };
+
+  // Langsung panggil kamera belakang tanpa getCameras()
+  html5QrCode.start(
+    { facingMode: "environment" }, 
+    qrConfig,
+    (decodedText) => {
+      handleScanSuccess(decodedText);
+    },
+    (errorMessage) => { 
+      // Abaikan error saat proses scanning
+    }
+  ).catch(err => {
+    alert("Kamera gagal dibuka. Pastikan Anda menggunakan HTTPS/URL Exec dan sudah mengizinkan kamera di browser. Error: " + err);
+  });
 }
 
 function handleScanSuccess(decodedText) {
+  // Masukkan hasil ke search input
   const searchInput = document.getElementById('searchInput');
-  if(searchInput) searchInput.value = decodedText;
+  searchInput.value = decodedText;
   
+  // Tutup scanner
   closeScanner();
   
+  // Cari produk berdasarkan ID Variasi
   const matchedProduct = products.find(p => {
     const ids = p.id_variasi ? p.id_variasi.toString().split(',').map(id => id.trim()) : [];
     return ids.includes(decodedText) || p.id === decodedText;
   });
 
   if (matchedProduct) {
+    // Jika ketemu, buka modal variasi atau langsung tambahkan
     handleAddToCart(matchedProduct.id || matchedProduct.nama);
+    // Jika variasi banyak, seleksi otomatis variasi yang sesuai ID-nya
     setTimeout(() => autoSelectVariation(decodedText), 500);
   } else {
     alert("Produk tidak ditemukan: " + decodedText);
+    filterProducts(); // Tetap jalankan filter biasa
   }
 }
 
@@ -1219,40 +1212,6 @@ function filterDelivery(status, btn) {
   );
   
   renderDeliveryList(filtered);
-}
-
-// HP mengirim hasil scan ke Server
-async function sendScanResultToBackend(code) {
-  showLoading(true);
-  try {
-    const payload = { 
-      action: "postRemoteScan", 
-      code: code, 
-      user: "admin" // Pastikan user sama antara HP & Laptop
-    };
-    await fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) });
-    alert("Berhasil Scan: " + code + ". Data terkirim ke Laptop.");
-  } catch (e) { alert("Gagal kirim data"); }
-  showLoading(false);
-}
-
-// Laptop mengecek hasil scan dari Server secara berkala
-function startListeningRemoteScan() {
-  const interval = setInterval(async () => {
-    try {
-      const resp = await fetch(WEB_APP_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "getRemoteScan", user: "admin" })
-      });
-      const res = await resp.json();
-      
-      if (res.code) {
-        handleScanSuccess(res.code); // Masukkan ke keranjang laptop
-        clearInterval(interval);    // Berhenti mengecek setelah ketemu
-        alert("Produk Berhasil Masuk!");
-      }
-    } catch (e) { console.error("Waiting..."); }
-  }, 3000); // Cek setiap 3 detik
 }
 
 </script>
