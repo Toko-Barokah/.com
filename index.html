@@ -110,10 +110,15 @@
 </div>
 
 <nav class="navbar navbar-dark bg-primary mb-4 shadow-sm">
-  <div class="container">
+  <div class="container d-flex justify-content-between align-items-center">
     <span class="navbar-brand mb-0 h1" id="pageTitle">Beranda</span>
+    <div class="d-flex align-items-center" onclick="switchPage('pengiriman', this)" style="cursor: pointer; color: white;">
+      <span class="material-icons me-1">local_shipping</span>
+      <span class="fw-bold">Pengiriman</span>
+    </div>
   </div>
 </nav>
+
 
 <div class="container">
   
@@ -287,6 +292,26 @@
       </div>
     </div>
   </div>
+  
+  <div id="pengirimanPage" class="page">
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <h6 class="fw-bold mb-3">Status Pengiriman</h6>
+      <div class="d-flex gap-2 overflow-auto pb-2" id="deliveryFilters">
+        <button id="btnFilterBayar" class="btn btn-sm btn-outline-primary active" onclick="filterDelivery('Bayar', this)">Bayar</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="filterDelivery('Dikemas', this)">Dikemas</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="filterDelivery('Dikirim', this)">Dikirim</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="filterDelivery('Selesai', this)">Selesai</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deliveryList">
+    <div class="text-center p-5 text-muted small">Memuat data...</div>
+  </div>
+</div>
+
+
 
   <div id="transaksiPage" class="page">
     <div class="card shadow-sm border-0">
@@ -365,7 +390,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 <script>
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzFgRERHARo3wLPj7rAJAcNf8p9bKwlawH7SgidbMjgzwcRSbnQmPXef9slgk5ybnvZ/exec";
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyKcI5QQVheT_o0Xrx-IFnCOso1ULf4L-06OaB-9PdTR4GKwA1PAijy5Y764I82J5Wz/exec";
   
   let products = [];
   let cart = [];
@@ -484,32 +509,25 @@ modalBody.innerHTML = variations.map((v, idx) => {
   const cartList = document.getElementById('cartItems');
   subtotal = 0;
   cartList.innerHTML = cart.map((item, idx) => {
-    // Hitung subtotal tiap barang: (Harga x Qty) - Potongan Item
-    const itemSubtotal = (item.harga * item.qty) - (item.diskon || 0);
+    const itemSubtotal = item.harga * item.qty;
     subtotal += itemSubtotal;
     
     return `
       <li class="list-group-item px-0 py-2 border-bottom">
         <div class="d-flex justify-content-between align-items-start">
-          <div style="max-width: 75%;">
+          <div style="max-width: 85%;">
             <div class="fw-bold small text-truncate">${item.nama}</div>
             <div class="text-muted" style="font-size: 0.7rem;">
               ${item.variasi} | Rp ${item.harga.toLocaleString()} x ${item.qty}
             </div>
           </div>
-          <button class="btn btn-sm text-danger p-0" onclick="removeFromCart(${idx})">
-            <span class="material-icons" style="font-size: 18px;">delete_outline</span>
-          </button>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mt-1">
-          <div class="input-group input-group-sm" style="width: 110px;">
-            <span class="input-group-text p-1" style="font-size:0.6rem">Disc</span>
-            <input type="number" class="form-control p-1" style="font-size:0.7rem" 
-              placeholder="0" value="${item.diskon || ''}" 
-              onkeyup="updateItemDiscount(${idx}, this.value)">
-          </div>
-          <div class="fw-bold text-dark" style="font-size: 0.75rem;">
-            Rp ${Math.max(0, itemSubtotal).toLocaleString()}
+          <div class="text-end">
+            <div class="fw-bold text-dark mb-1" style="font-size: 0.75rem;">
+               Rp ${itemSubtotal.toLocaleString()}
+            </div>
+            <button class="btn btn-sm text-danger p-0" onclick="removeFromCart(${idx})">
+              <span class="material-icons" style="font-size: 18px;">delete_outline</span>
+            </button>
           </div>
         </div>
       </li>`;
@@ -556,44 +574,47 @@ function updateItemDiscount(index, value) {
     changeDisplay.style.color = change < 0 ? "red" : "green";
   }
 
-    async function checkout() {
-    if (cart.length === 0) return alert("Keranjang kosong!");
-    const method = document.getElementById('paymentMethod').value;
-    const name = document.getElementById('custName').value.trim();
-    const dueDateValue = document.getElementById('dueDate').value;
+  async function checkout() {
+  if (cart.length === 0) return alert("Keranjang kosong!");
+  const method = document.getElementById('paymentMethod').value;
+  const name = document.getElementById('custName').value.trim();
+  const dueDateValue = document.getElementById('dueDate').value;
+  const discountAmount = parseFloat(document.getElementById('discountInput').value) || 0;
 
-    if (method === "Kredit" && !name) return alert("Nama pelanggan wajib di isi!");
-    if (method === "Kredit" && !dueDateValue) return alert("Pilih tanggal jatuh tempo!");
+  if (method === "Kredit" && !name) return alert("Nama pelanggan wajib di isi!");
 
-    const payload = {
-      action: "submitOrder",
-      data: {
-        penerima: name || "-",
-        alamat: "Kasir", // Alamat murni
-        dueDate: dueDateValue, // Kirim tanggal terpisah
-        items: JSON.stringify(cart),
-        total: finalTotal,
-        metode: method,
-        status: method === "Kredit" ? "Belum Lunas" : "Lunas"
-      }
-    };
+  const payload = {
+    action: "submitOrder",
+    data: {
+      penerima: name || "-",
+      alamat: "Kasir",
+      dueDate: dueDateValue,
+      items: JSON.stringify(cart),
+      subtotal: subtotal,        // Mengirim subtotal murni
+      potongan: discountAmount,  // Mengirim potongan nota agar terbaca backend
+      total: finalTotal,         // Hasil akhir (Subtotal - Potongan)
+      metode: method,
+      status: method === "Kredit" ? "Belum Lunas" : "Lunas"
+    }
+  };
 
-    showLoading(true);
-    try {
-      const response = await fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) });
-      const result = await response.json();
-      if (result.status === "success") {
-        alert("Berhasil! Resi: " + result.resi);
-        cart = []; renderCart();
-        document.getElementById('custName').value = "";
-        document.getElementById('cashReceived').value = "";
-        document.getElementById('discountInput').value = "";
-        document.getElementById('dueDate').value = "";
-        fetchProducts();
-      }
-    } catch (e) { alert("Error koneksi"); }
-    showLoading(false);
-  }
+  showLoading(true);
+  try {
+    const response = await fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) });
+    const result = await response.json();
+    if (result.status === "success") {
+      alert("Berhasil! Resi: " + result.resi);
+      // Reset semua field
+      cart = []; 
+      document.getElementById('discountInput').value = "";
+      document.getElementById('custName').value = "";
+      document.getElementById('cashReceived').value = "";
+      renderCart();
+      fetchProducts();
+    }
+  } catch (e) { alert("Error koneksi"); }
+  showLoading(false);
+}
 
     let historyData = []; // Variabel global untuk menyimpan data riwayat sementara
 
@@ -638,31 +659,61 @@ function updateItemDiscount(index, value) {
     }
   }    
   
-    function showReceipt(index) {
+  function showReceipt(index) {
   const order = historyData[index];
-  const items = JSON.parse(order.items);
   const content = document.getElementById('receiptContent');
+  
+    let items;
+  let diskon = 0;
+  
+  try {
+    const rawData = JSON.parse(order.items);
+    // Jika data baru (format objek), ambil dari properti produk
+    if (rawData.produk) {
+      items = rawData.produk;
+      diskon = rawData.ringkasan.diskon|| 0;
+    } else {
+      // Jika data lama (format array langsung), tetap dukung agar resi lama bisa dibuka
+      items = rawData;
+    }
+  } catch(e) {
+    items = [];
+  }
 
   let rawSubtotal = 0;
   let itemsHtml = items.map(item => {
-    const itemTotal = item.harga * item.qty;
-    rawSubtotal += itemTotal;
+    // Hitung subtotal tiap item (Harga x Qty) - Diskon per Item jika ada
+    const itemSubtotal = (item.harga * item.qty) - (item.diskon || 0);
+    rawSubtotal += itemSubtotal;
     return `
       <div class="d-flex justify-content-between small mb-1">
         <span>${item.nama} (${item.variasi}) x${item.qty}</span>
-        <span>Rp ${itemTotal.toLocaleString()}</span>
+        <span>Rp ${itemSubtotal.toLocaleString()}</span>
       </div>`;
   }).join('');
 
-  const discountAmount = rawSubtotal - Number(order.total);
+  // 1. Ambil Nilai Ongkir (Kolom 11)
+  const ongkirVal = parseFloat(order.ongkir) || 0;
+  
+  // 2. Hitung Potongan Harga (Diskon Keseluruhan Nota)
+  // Rumus: (Subtotal + Ongkir) - Total Akhir di Sheet
+  const totalDiSheet = Number(order.total);
+  const discountAmount = (rawSubtotal + ongkirVal) - totalDiSheet;
+
   let discountHtml = (discountAmount > 0) ? `
     <div class="d-flex justify-content-between small text-danger mb-1">
       <span>Potongan:</span>
       <span>- Rp ${discountAmount.toLocaleString()}</span>
     </div>` : "";
 
+  let ongkirHtml = (ongkirVal > 0) ? `
+    <div class="d-flex justify-content-between small mb-1">
+      <span>Ongkos Kirim:</span>
+      <span>Rp ${ongkirVal.toLocaleString()}</span>
+    </div>` : "";
+
   let dueDateHtml = "";
-  if (order.metode === "Kredit" && order.jatuhTempo) {
+  if (order.metode === "Kredit" && order.jatuhTempo && order.jatuhTempo !== "-") {
     const tglSaja = order.jatuhTempo.split('T')[0];
     dueDateHtml = `
       <div class="d-flex justify-content-between small">
@@ -693,23 +744,31 @@ function updateItemDiscount(index, value) {
       ${dueDateHtml}
       <div class="d-flex justify-content-between small">
         <b>Keterangan:</b>
-        <span class="fw-bold">${order.status}</span>
+        <span class="fw-bold text-uppercase">${order.status}</span>
       </div>
     </div>
 
-    <div class="mb-3">${itemsHtml}</div>
+    <div class="mb-3">
+      <div class="fw-bold small mb-1 text-muted">Rincian Barang:</div>
+      ${itemsHtml}
+    </div>
 
     <div class="border-top pt-2">
+      <div class="d-flex justify-content-between small mb-1">
+        <span>Subtotal:</span>
+        <span>Rp ${rawSubtotal.toLocaleString()}</span>
+      </div>
+      ${ongkirHtml}
       ${discountHtml}
       <div class="d-flex justify-content-between fw-bold mb-2">
         <span>TOTAL</span>
-        <span class="text-primary">Rp ${Number(order.total).toLocaleString()}</span>
+        <span class="text-primary">Rp ${totalDiSheet.toLocaleString()}</span>
       </div>
     </div>
     
     <div class="mt-4 pt-3 border-top border-dashed">
       <div class="text-center mb-3">
-        <small class="mb-3" style="font-size: 0.8rem; font-style: italic;">- Terima Kasih Atas Kunjungan Anda -</small>
+        <small style="font-size: 0.8rem; font-style: italic;">- Terima Kasih Atas Kunjungan Anda -</small>
       </div>
       
       <div style="font-size: 0.65rem; color: #495057; line-height: 1.5;">
@@ -1066,6 +1125,96 @@ function closeScanner() {
   } else {
     document.getElementById('scannerContainer').style.display = 'none';
   }
+}
+
+// Tambahkan di fungsi switchPage agar judul berubah
+function switchPage(pageId, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  
+  const targetPage = document.getElementById(pageId + 'Page');
+  if(targetPage) targetPage.classList.add('active');
+  
+  // Update Judul di Navbar
+  const titles = { 'beranda': 'Beranda', 'kalkulator': 'Kalkulator', 'transaksi': 'Riwayat', 'pengiriman': 'Status Pengiriman' };
+  document.getElementById('pageTitle').innerText = titles[pageId] || 'Toko Barokah';
+
+  if(pageId === 'transaksi') fetchHistory();
+  if(pageId === 'pengiriman') fetchDeliveryData(); // Panggil data pengiriman
+}
+
+async function fetchDeliveryData() {
+  const listDiv = document.getElementById('deliveryList');
+  try {
+    const resp = await fetch(WEB_APP_URL, { method: "POST", body: JSON.stringify({ action: "getOrders" }) });
+    historyData = await resp.json(); 
+    
+    // Langsung filter ke 'Bayar' sebagai default saat data masuk
+    const btnBayar = document.getElementById('btnFilterBayar');
+    filterDelivery('Bayar', btnBayar);
+    
+  } catch (e) {
+    listDiv.innerHTML = '<div class="alert alert-danger">Gagal memuat data.</div>';
+  }
+}
+
+function renderDeliveryList(orders) {
+  const listDiv = document.getElementById('deliveryList');
+  if (orders.length === 0) {
+    listDiv.innerHTML = '<div class="text-center p-5 text-muted">Tidak ada pesanan.</div>';
+    return;
+  }
+
+  listDiv.innerHTML = orders.map((o, idx) => {
+    // Memastikan hanya status pengiriman yang diproses
+    // Jika status berisi "Lunas" atau "Belum Lunas", kita tidak menampilkannya sebagai badge pengiriman
+    const isPaymentStatus = (o.status === "Lunas" || o.status === "Belum Lunas");
+    
+    // Warna Badge berdasarkan status logistik
+    const statusColors = { 
+      'Bayar': 'bg-danger', 
+      'Dikemas': 'bg-warning text-dark', 
+      'Dikirim': 'bg-info text-white', 
+      'Selesai': 'bg-success' 
+    };
+    
+    const badgeClass = statusColors[o.status] || 'bg-secondary';
+    
+    // Jika statusnya adalah Lunas/Belum Lunas, tampilkan sebagai "Proses" atau sembunyikan badgenya
+    const displayStatus = isPaymentStatus ? "Menunggu" : o.status;
+
+    return `
+      <div class="card mb-2 border-0 shadow-sm" onclick="showReceipt(${historyData.indexOf(o)})" style="cursor:pointer">
+        <div class="card-body p-3">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-bold">${o.penerima}</div>
+              <small class="text-muted">${o.resi || 'No Resi -'}</small>
+            </div>
+            ${!isPaymentStatus ? `<span class="badge ${badgeClass}">${displayStatus}</span>` : `<span class="badge bg-light text-muted border">Baru</span>`}
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <small class="text-muted">${o.waktu}</small>
+            <div class="fw-bold text-primary">Rp ${Number(o.total).toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+
+function filterDelivery(status, btn) {
+  // Update UI Tombol Aktif
+  document.querySelectorAll('#deliveryFilters .btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+
+  // Langsung filter berdasarkan status yang dipilih
+  const filtered = historyData.filter(o => 
+    o.status && o.status.toLowerCase() === status.toLowerCase()
+  );
+  
+  renderDeliveryList(filtered);
 }
 
 </script>
