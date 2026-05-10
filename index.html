@@ -101,6 +101,25 @@
   background: white;
 }
 
+/* Batasi tampilan produk agar hanya 1 baris (sekitar 180-200px) */
+#productGrid {
+  max-height: 190px; 
+  overflow: hidden;
+  transition: max-height 0.4s ease-out;
+}
+
+/* Class saat mode "Lihat Semua" aktif */
+#productGrid.expanded {
+  max-height: 2000px; /* Angka besar agar semua produk terlihat */
+  overflow: visible;
+}
+
+.view-all-container {
+  text-align: center;
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
   </style>
 </head>
 <body>
@@ -133,6 +152,15 @@
   </button>
 </div>
 
+ <div class="row" id="productGrid"></div>
+        
+        <div class="view-all-container" id="btnViewAllWrapper" style="display: none;">
+          <button class="btn btn-outline-primary btn-sm rounded-pill px-4" id="btnToggleProducts" onclick="toggleProductList()">
+            <span class="material-icons align-middle" style="font-size: 16px;">expand_more</span> 
+            Lihat Semua Produk
+          </button>
+        </div>
+
 <div id="scannerContainer" class="card mb-3 shadow-sm" style="display: none; overflow: hidden; border-radius: 15px;">
   <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
     <span class="small fw-bold">Scan Barcode / Upload Gambar</span>
@@ -158,9 +186,15 @@
     <div class="card-body">
       
       <div id="manualInputForm" class="mb-3 p-3 border rounded bg-white shadow-sm" style="display: none;">
-  <h6 class="fw-bold mb-3 text-primary d-flex align-items-center">
-    <span class="material-icons me-1">edit_note</span> Input Produk Manual
-  </h6>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="fw-bold mb-0 text-primary d-flex align-items-center">
+      <span class="material-icons me-1">edit_note</span> Input Produk Manual
+    </h6>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="checkAllManual" checked onclick="toggleAllCheckboxes(this)">
+      <label class="form-check-label small fw-bold" for="checkAllManual">Pilih Semua</label>
+    </div>
+  </div>
   
   <div class="mb-3">
     <label class="small fw-bold">Nama Produk</label>
@@ -404,28 +438,49 @@
     showLoading(false);
   }
 
-    function renderProducts(data) {
-    const grid = document.getElementById('productGrid');
-    grid.innerHTML = data.map(p => {
-      // Ambil harga pertama jika ada banyak variasi harga
-      let displayPrice = 0;
-      if (p.harga) {
-        const priceList = p.harga.toString().split(',');
-        displayPrice = parseFloat(priceList[0].trim());
-      }
+  // Update fungsi renderProducts
+function renderProducts(data) {
+  const grid = document.getElementById('productGrid');
+  const btnWrapper = document.getElementById('btnViewAllWrapper');
+  
+  // Tampilkan tombol hanya jika produk lebih dari 2 (karena col-6 berarti 2 produk per baris)
+  btnWrapper.style.display = data.length > 2 ? 'block' : 'none';
+  
+  grid.innerHTML = data.map(p => {
+    let displayPrice = 0;
+    if (p.harga) {
+      const priceList = p.harga.toString().split(',');
+      displayPrice = parseFloat(priceList[0].trim());
+    }
 
-      return `
-        <div class="col-6 col-md-4 mb-3">
-          <div class="card product-card h-100 shadow-sm" onclick="handleAddToCart('${p.id || p.nama}')">
-            <div class="card-body p-2 text-center">
-              <h6 class="card-title mb-1 small fw-bold text-truncate">${p.nama}</h6>
-              <p class="text-primary fw-bold mb-0 small">Rp ${isNaN(displayPrice) ? '0' : displayPrice.toLocaleString()}</p>
-            </div>
+    return `
+      <div class="col-6 col-md-4 mb-3">
+        <div class="card product-card h-100 shadow-sm" onclick="handleAddToCart('${p.id || p.nama}')">
+          <div class="card-body p-2 text-center">
+            <h6 class="card-title mb-1 small fw-bold text-truncate">${p.nama}</h6>
+            <p class="text-primary fw-bold mb-0 small">Rp ${isNaN(displayPrice) ? '0' : displayPrice.toLocaleString()}</p>
           </div>
         </div>
-      `;
-    }).join('');
+      </div>
+    `;
+  }).join('');
+}
+
+// Fungsi Baru untuk Buka-Tutup List
+function toggleProductList() {
+  const grid = document.getElementById('productGrid');
+  const btn = document.getElementById('btnToggleProducts');
+  
+  grid.classList.toggle('expanded');
+  
+  if (grid.classList.contains('expanded')) {
+    btn.innerHTML = '<span class="material-icons align-middle" style="font-size: 16px;">expand_less</span> Sembunyikan';
+  } else {
+    btn.innerHTML = '<span class="material-icons align-middle" style="font-size: 16px;">expand_more</span> Lihat Semua Produk';
+    // Scroll balik ke atas agar tidak bingung setelah list mengecil
+    document.getElementById('searchInput').scrollIntoView({ behavior: 'smooth' });
   }
+}
 
   function filterProducts() {
     const term = document.getElementById('searchInput').value.toLowerCase();
@@ -947,6 +1002,23 @@ function addManualRow(v = "", h = "", s = "") {
   `;
   container.appendChild(div);
 }
+
+function toggleAllCheckboxes(master) {
+  const checkboxes = document.querySelectorAll('.man-check');
+  checkboxes.forEach(cb => {
+    cb.checked = master.checked;
+  });
+}
+
+// Tambahan opsional: Agar checkbox "Pilih Semua" otomatis mati jika salah satu anak tidak dicentang
+document.addEventListener('change', function(e) {
+  if (e.target && e.target.classList.contains('man-check')) {
+    const master = document.getElementById('checkAllManual');
+    const checkboxes = document.querySelectorAll('.man-check');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    master.checked = allChecked;
+  }
+});
 
 function removeManualRow(btn) {
   const rows = document.querySelectorAll('.manual-row');
