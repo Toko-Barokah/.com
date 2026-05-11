@@ -542,7 +542,7 @@ modalBody.innerHTML = variations.map((v, idx) => {
   renderCart();
 }
 
-  function renderCart() {
+function renderCart() {
   const cartList = document.getElementById('cartItems');
   subtotal = 0;
   cartList.innerHTML = cart.map((item, idx) => {
@@ -551,25 +551,58 @@ modalBody.innerHTML = variations.map((v, idx) => {
     
     return `
       <li class="list-group-item px-0 py-2 border-bottom">
-        <div class="d-flex justify-content-between align-items-start">
-          <div style="max-width: 85%;">
+        <div class="d-flex align-items-center justify-content-between">
+          
+          <div style="width: 40%;">
             <div class="fw-bold small text-truncate">${item.nama}</div>
             <div class="text-muted" style="font-size: 0.7rem;">
-              ${item.variasi} | Rp ${item.harga.toLocaleString()} x ${item.qty}
+              ${item.variasi} | Rp ${item.harga.toLocaleString()}
             </div>
           </div>
-          <div class="text-end">
-            <div class="fw-bold text-dark mb-1" style="font-size: 0.75rem;">
+
+          <div class="d-flex align-items-center justify-content-center gap-1" style="width: 30%;">
+            <button class="btn btn-sm btn-outline-secondary p-0 d-flex align-items-center" 
+                    onclick="updateQty(${idx}, -1)" style="width: 22px; height: 22px; justify-content: center;">
+              <span class="material-icons" style="font-size: 14px;">remove</span>
+            </button>
+            
+            <span class="fw-bold text-center" style="font-size: 0.85rem; min-width: 20px;">${item.qty}</span>
+            
+            <button class="btn btn-sm btn-outline-secondary p-0 d-flex align-items-center" 
+                    onclick="updateQty(${idx}, 1)" style="width: 22px; height: 22px; justify-content: center;">
+              <span class="material-icons" style="font-size: 14px;">add</span>
+            </button>
+          </div>
+
+          <div class="text-end" style="width: 30%;">
+            <div class="fw-bold text-dark" style="font-size: 0.75rem;">
                Rp ${itemSubtotal.toLocaleString()}
             </div>
             <button class="btn btn-sm text-danger p-0" onclick="removeFromCart(${idx})">
-              <span class="material-icons" style="font-size: 18px;">delete_outline</span>
+              <span class="material-icons" style="font-size: 16px;">delete_outline</span>
             </button>
           </div>
+
         </div>
       </li>`;
   }).join('');
   updateFinalTotal();
+}
+
+function updateQty(index, delta) {
+  // Update jumlah
+  cart[index].qty += delta;
+
+  // Jika jumlah kurang dari 1, hapus dari keranjang atau biarkan minimal 1
+  if (cart[index].qty < 1) {
+    if (confirm("Hapus barang dari keranjang?")) {
+      removeFromCart(index);
+    } else {
+      cart[index].qty = 1;
+    }
+  }
+  
+  renderCart();
 }
 
 // --- Tambahkan fungsi baru ini di bawah renderCart ---
