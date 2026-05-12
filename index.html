@@ -260,55 +260,76 @@
     </div>
   </div>
   
-  <div id="kalkulatorPage" class="page">
+    <div id="kalkulatorPage" class="page">
     <div class="row justify-content-center">
       <div class="col-md-6">
         <div class="card calc-card shadow-sm">
           <div class="card-body">
-            <h5 class="fw-bold mb-4 text-center text-primary">Kalkulator Harga Eceran</h5>
-            
+    <h5 class="fw-bold mb-4 text-center text-primary">Kalkulator Harga Eceran</h5>
+    
+    <div class="calc-input-group">
+      <label class="small fw-bold text-muted">Nama Produk (Eceran)</label>
+      <input type="text" id="calcNama" class="form-control" placeholder="Contoh: Semen Gresik (Eceran)" onkeyup="searchProductForCalc(this.value)">
+      <div id="calcSuggestion" class="list-group position-absolute shadow-sm" style="z-index: 1050; width: 85%;"></div>
+    </div>
+
             <div class="calc-input-group">
-              <label class="small fw-bold text-muted">Harga Produk (Pokok)</label>
+              <label class="small fw-bold text-muted">Harga Pokok</label>
               <div class="input-group">
                 <span class="input-group-text">Rp</span>
-                <input type="number" id="calcHarga" class="form-control form-control-lg" placeholder="10.000" onkeyup="hitungEceran()">
+                <input type="number" id="calcHarga" class="form-control form-control-lg fw-bold" placeholder="40000" onkeyup="hitungEceran()">
               </div>
+               <div class="form-text text-danger" style="font-size: 0.7rem;">
+                 * 1kg=40rb 
+               </div>
             </div>
 
             <div class="row">
               <div class="col-6">
                 <div class="calc-input-group">
                   <label class="small fw-bold text-muted">Ukuran Total</label>
-                  <input type="number" id="calcUkuran" class="form-control" placeholder="cm" onkeyup="hitungEceran()">
+                  <input type="number" id="calcUkuran" class="form-control" placeholder="cm/gr" onkeyup="hitungEceran()">
+                  <div class="form-text text-danger" style="font-size: 0.7rem;">
+                 * 1kg=1000gr * 1M=100cm
+               </div>
                 </div>
               </div>
               <div class="col-6">
                 <div class="calc-input-group">
-                  <label class="small fw-bold text-muted">Pembelian</label>
-                  <input type="number" id="calcPotongan" class="form-control" placeholder="cm" onkeyup="hitungEceran()">
+                  <label class="small fw-bold text-muted">Jumlah Beli</label>
+                  <input type="number" id="calcPotongan" class="form-control" placeholder="cm/gr" onkeyup="hitungEceran()">
+                  <div class="form-text text-danger" style="font-size: 0.7rem;">
+                 * Hasil hitungan gr/cm
+               </div>
                 </div>
               </div>
             </div>
 
             <div class="calc-input-group">
-              <label class="small fw-bold text-muted">Keuntungan</label>
-              <input type="number" id="calcUntung" class="form-control" placeholder="11" onkeyup="hitungEceran()">
+              <label class="small fw-bold text-muted">Margin</label>
+              <input type="number" id="calcUntung" class="form-control" placeholder="1.1" value="11" onkeyup="hitungEceran()">
+              <div class="form-text text-danger" style="font-size: 0.7rem;">
+                 * Paralon 11 * timbangan 10
+               </div>
             </div>
 
-            <div class="result-box mt-4">
-              <div class="small text-muted mb-1">Total Perhitungan:</div>
+            <div class="result-box mt-4 bg-light border-primary">
+              <div class="small text-muted mb-1">Subtotal Item:</div>
               <h4 id="calcRawTotal" class="text-secondary mb-3" style="text-decoration: line-through; opacity: 0.6;">Rp 0</h4>
-              <div class="small fw-bold text-primary mb-1">HARGA JUAL ECERAN:</div>
+              <div class="small fw-bold text-primary mb-1">TOTAL AKHIR (ECERAN):</div>
               <h2 id="calcFinalResult" class="fw-bold text-primary mb-0">Rp 0</h2>
             </div>
             
-            <button class="btn btn-outline-secondary w-100 mt-4" onclick="resetCalc()">Reset</button>
+            <button class="btn btn-success w-100 mt-4 fw-bold py-3 shadow" onclick="addCalcToCart()">
+              <span class="material-icons align-middle">add_shopping_cart</span> MASUKKAN KERANJANG
+            </button>
+            <button class="btn btn-link w-100 mt-2 text-muted small" onclick="resetCalc()">Reset Form</button>
           </div>
         </div>
       </div>
     </div>
   </div>
-  
+ 
   <div id="pengirimanPage" class="page">
   <div class="card shadow-sm border-0 mb-3">
     <div class="card-body">
@@ -403,6 +424,17 @@
   </div>
 </div>
 
+<div class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 3000;">
+  <div id="stockToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body">
+        <span class="material-icons align-middle me-2">warning</span>
+        Jumlah beli melebihi stok yang tersedia!
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -524,98 +556,154 @@ modalBody.innerHTML = variations.map((v, idx) => {
 }
 
 
-    function addToCart(variationName, price) {
-  const existing = cart.find(item => item.nama === selectedProduct.nama && item.variasi === variationName);
+function addToCart(variationName, price) {
+  const product = selectedProduct;
+  const variations = product.variasi.split(',').map(v => v.trim());
+  const stocks = product.stok.toString().split(',').map(s => parseInt(s.trim()));
+  const varIdx = variations.indexOf(variationName);
+  const availableStock = stocks[varIdx] || 0;
+
+  const existing = cart.find(item => item.nama === product.nama && item.variasi === variationName);
+  
   if (existing) {
+    if (existing.qty + 1 > availableStock) {
+      showStockWarning(); // Munculkan notifikasi jika melebihi stok
+      return;
+    }
     existing.qty++;
   } else {
+    // Cek jika stok memang 0 dari awal
+    if (availableStock < 1) {
+      showStockWarning();
+      return;
+    }
     cart.push({ 
-      nama: selectedProduct.nama, 
+      nama: product.nama, 
       variasi: variationName, 
       harga: price, 
       qty: 1,
-      diskon: 0 // Inisialisasi diskon produk
+      diskon: 0 
     });
   }
+  
   const modal = bootstrap.Modal.getInstance(document.getElementById('variationModal'));
   if(modal) modal.hide();
   renderCart();
 }
 
+// --- UPDATE FUNGSI RENDER KERANJANG ---
 function renderCart() {
   const cartList = document.getElementById('cartItems');
   subtotal = 0;
+  let totalPotonganAkumulasi = 0; 
+
   cartList.innerHTML = cart.map((item, idx) => {
-    const itemSubtotal = item.harga * item.qty;
-    subtotal += itemSubtotal;
+    const itemSubtotalAsli = item.harga * item.qty;
+    subtotal += itemSubtotalAsli;
+    
+    // Menghitung akumulasi potongan untuk dipindahkan ke diskon nota
+    totalPotonganAkumulasi += (item.diskon || 0) * item.qty;
     
     return `
       <li class="list-group-item px-0 py-2 border-bottom">
         <div class="d-flex align-items-center justify-content-between">
-          
-          <div style="width: 40%;">
+          <div style="width: 35%;">
             <div class="fw-bold small text-truncate">${item.nama}</div>
             <div class="text-muted" style="font-size: 0.7rem;">
               ${item.variasi} | Rp ${item.harga.toLocaleString()}
             </div>
           </div>
 
-          <div class="d-flex align-items-center justify-content-center gap-1" style="width: 30%;">
+          <div class="d-flex align-items-center justify-content-center gap-1" style="width: 25%;">
             <button class="btn btn-sm btn-outline-secondary p-0 d-flex align-items-center" 
                     onclick="updateQty(${idx}, -1)" style="width: 22px; height: 22px; justify-content: center;">
               <span class="material-icons" style="font-size: 14px;">remove</span>
             </button>
-            
             <span class="fw-bold text-center" style="font-size: 0.85rem; min-width: 20px;">${item.qty}</span>
-            
             <button class="btn btn-sm btn-outline-secondary p-0 d-flex align-items-center" 
                     onclick="updateQty(${idx}, 1)" style="width: 22px; height: 22px; justify-content: center;">
               <span class="material-icons" style="font-size: 14px;">add</span>
             </button>
           </div>
 
-          <div class="text-end" style="width: 30%;">
+          <div style="width: 20%;">
+            <input type="number" class="form-control form-control-sm" 
+                   placeholder="Pot." value="${item.diskon || ''}" 
+                   onkeyup="updateItemDiscount(${idx}, this.value)"
+                   style="font-size: 0.7rem; padding: 2px 4px;">
+          </div>
+
+          <div class="text-end" style="width: 20%;">
             <div class="fw-bold text-dark" style="font-size: 0.75rem;">
-               Rp ${itemSubtotal.toLocaleString()}
+               Rp ${itemSubtotalAsli.toLocaleString()}
             </div>
             <button class="btn btn-sm text-danger p-0" onclick="removeFromCart(${idx})">
               <span class="material-icons" style="font-size: 16px;">delete_outline</span>
             </button>
           </div>
-
         </div>
       </li>`;
   }).join('');
+
+  // Otomatis update input potongan nota di bawah keranjang
+  document.getElementById('discountInput').value = totalPotonganAkumulasi;
   updateFinalTotal();
 }
 
 function updateQty(index, delta) {
-  // Update jumlah
-  cart[index].qty += delta;
+  const item = cart[index];
+  
+  // Cari data stok asli dari master products
+  const masterProduct = products.find(p => p.nama === item.nama);
+  if (masterProduct && delta > 0) {
+    const variations = masterProduct.variasi.split(',').map(v => v.trim());
+    const stocks = masterProduct.stok.toString().split(',').map(s => parseInt(s.trim()));
+    const varIdx = variations.indexOf(item.variasi);
+    const availableStock = stocks[varIdx] || 0;
 
-  // Jika jumlah kurang dari 1, hapus dari keranjang atau biarkan minimal 1
-  if (cart[index].qty < 1) {
+    if (item.qty + delta > availableStock) {
+      showStockWarning(); // Munculkan notifikasi
+      return; 
+    }
+  }
+
+  item.qty += delta;
+
+  if (item.qty < 1) {
     if (confirm("Hapus barang dari keranjang?")) {
       removeFromCart(index);
     } else {
-      cart[index].qty = 1;
+      item.qty = 1;
     }
   }
   
   renderCart();
 }
 
-// --- Tambahkan fungsi baru ini di bawah renderCart ---
 function updateItemDiscount(index, value) {
   cart[index].diskon = parseFloat(value) || 0;
   
-  // Hitung ulang subtotal keseluruhan
-  let tempSubtotal = 0;
+  let totalSemuaPotongan = 0;
   cart.forEach(item => {
-    tempSubtotal += (item.harga * item.qty) - (item.diskon || 0);
+    totalSemuaPotongan += (item.diskon || 0) * item.qty;
   });
-  subtotal = tempSubtotal;
+
+  // Tampilkan totalnya di potongan nota (bawah)
+  document.getElementById('discountInput').value = totalSemuaPotongan;
   updateFinalTotal();
+}
+
+// --- 3. Pastikan updateFinalTotal mengambil nilai terbaru ---
+function updateFinalTotal() {
+  const discount = parseFloat(document.getElementById('discountInput').value) || 0;
+  
+  // subtotal di sini adalah total harga asli (qty * harga)
+  // finalTotal adalah subtotal dikurangi total akumulasi potongan
+  finalTotal = Math.max(0, subtotal - discount);
+  
+  document.getElementById('subtotalDisplay').innerText = "Rp " + subtotal.toLocaleString();
+  document.getElementById('cartTotal').innerText = "Rp " + finalTotal.toLocaleString();
+  calculateChange();
 }
 
   function removeFromCart(index) { cart.splice(index, 1); renderCart(); }
@@ -644,25 +732,35 @@ function updateItemDiscount(index, value) {
     changeDisplay.style.color = change < 0 ? "red" : "green";
   }
 
-  async function checkout() {
+// --- UPDATE FUNGSI CHECKOUT ---
+async function checkout() {
   if (cart.length === 0) return alert("Keranjang kosong!");
   const method = document.getElementById('paymentMethod').value;
   const name = document.getElementById('custName').value.trim();
   const dueDateValue = document.getElementById('dueDate').value;
-  const discountAmount = parseFloat(document.getElementById('discountInput').value) || 0;
+  const totalDiscountNota = parseFloat(document.getElementById('discountInput').value) || 0;
 
   if (method === "Kredit" && !name) return alert("Nama pelanggan wajib di isi!");
+  
+  // Data item yang dikirim ke sheet tidak menyertakan kolom diskon per item
+  const cleanItems = cart.map(item => ({
+    nama: item.nama,
+    variasi: item.variasi,
+    harga: item.harga,
+    qty: item.qty
+    // diskon: item.diskon sengaja dibuang/tidak dikirim
+  }));
 
   const payload = {
     action: "submitOrder",
     data: {
-      penerima: name || "-",
+      penerima: name || "",
       alamat: "Kasir",
       dueDate: dueDateValue,
-      items: JSON.stringify(cart),
-      subtotal: subtotal,        // Mengirim subtotal murni
-      potongan: discountAmount,  // Mengirim potongan nota agar terbaca backend
-      total: finalTotal,         // Hasil akhir (Subtotal - Potongan)
+      items: JSON.stringify(cleanItems), // Mengirim array yang sudah bersih
+      subtotal: subtotal,               // Total sebelum potongan
+      potongan: totalDiscountNota,      // Total potongan nota (gabungan diskon item)
+      total: finalTotal,                // Subtotal - Potongan
       metode: method,
       status: method === "Kredit" ? "Belum Lunas" : "Lunas"
     }
@@ -674,7 +772,6 @@ function updateItemDiscount(index, value) {
     const result = await response.json();
     if (result.status === "success") {
       alert("Berhasil! Resi: " + result.resi);
-      // Reset semua field
       cart = []; 
       document.getElementById('discountInput').value = "";
       document.getElementById('custName').value = "";
@@ -682,7 +779,9 @@ function updateItemDiscount(index, value) {
       renderCart();
       fetchProducts();
     }
-  } catch (e) { alert("Error koneksi"); }
+  } catch (e) { 
+    alert("Error koneksi"); 
+  }
   showLoading(false);
 }
 
@@ -861,7 +960,7 @@ function updateItemDiscount(index, value) {
 }
 
 
-  // LOGIKA KALKULATOR ECERAN
+    // LOGIKA KALKULATOR ECERAN TERUPDATE
   function hitungEceran() {
     const harga = parseFloat(document.getElementById('calcHarga').value) || 0;
     const ukuran = parseFloat(document.getElementById('calcUkuran').value) || 0;
@@ -869,12 +968,13 @@ function updateItemDiscount(index, value) {
     const untung = parseFloat(document.getElementById('calcUntung').value) || 0;
 
     if (harga > 0 && ukuran > 0 && potongan > 0 && untung > 0) {
-      // Rumus: (Harga / Ukuran * Potongan * Untung)
+      // Rumus: (Harga / Ukuran * Jumlah Beli * Untung)
       let rawResult = (harga / ukuran) * potongan * untung;
       
-      // Menghapus angka terakhir (dibagi 10)
+      // Pembulatan/Penyesuaian (Sesuai permintaan Anda sebelumnya: hapus angka terakhir/bagi 10)
       let finalResult = Math.floor(rawResult / 10);
 
+      // Update Tampilan Nominal Menyesuaikan
       document.getElementById('calcRawTotal').innerText = "Rp " + Math.floor(rawResult).toLocaleString();
       document.getElementById('calcFinalResult').innerText = "Rp " + finalResult.toLocaleString();
     } else {
@@ -883,14 +983,92 @@ function updateItemDiscount(index, value) {
     }
   }
 
+  // FITUR MASUKKAN KERANJANG DARI KALKULATOR
+  function addCalcToCart() {
+  const nama = document.getElementById('calcNama').value.trim() || "Produk Eceran";
+  const totalHargaText = document.getElementById('calcFinalResult').innerText.replace(/[^\d]/g, '');
+  const hargaFinal = parseFloat(totalHargaText);
+
+  if (hargaFinal <= 0) {
+    alert("Hitung harga terlebih dahulu!");
+    return;
+  }
+
+  // Masukkan ke array keranjang
+  cart.push({
+    id: "ECR-" + Date.now(), 
+    nama: nama,
+    variasi: "Eceran (" + document.getElementById('calcPotongan').value + ")",
+    harga: hargaFinal,
+    qty: 1,
+    diskon: 0
+  });
+
+  renderCart(); // Update tampilan keranjang
+  
+  // Notifikasi singkat (opsional, bisa diganti toast agar tidak mengganggu)
+  alert(nama + " berhasil ditambahkan!");
+  switchPage('beranda', document.querySelector('.nav-item'));
+
+  // --- RISET OTOMATIS DI SINI ---
+  resetCalc(); 
+}
+
   function resetCalc() {
+    document.getElementById('calcNama').value = "";
     document.getElementById('calcHarga').value = "";
     document.getElementById('calcUkuran').value = "";
     document.getElementById('calcPotongan').value = "";
-    document.getElementById('calcUntung').value = "";
+    document.getElementById('calcUntung').value = "11";
     hitungEceran();
   }
   
+  function searchProductForCalc(val) {
+  const suggestionBox = document.getElementById('calcSuggestion');
+  if (val.length < 2) { suggestionBox.innerHTML = ""; return; }
+
+  const matches = products.filter(p => p.nama.toLowerCase().includes(val.toLowerCase()));
+  suggestionBox.innerHTML = matches.map(p => `
+    <div class="list-group-item list-group-item-action" onclick="fillCalcFromProduct('${p.nama}')">
+      <div class="fw-bold small">${p.nama}</div>
+      <small class="text-muted">Harga Toko: Rp ${p.harga.split(',')[0]}</small>
+    </div>
+  `).join('');
+}
+
+// Mengisi field kalkulator secara otomatis
+function fillCalcFromProduct(productName) {
+  const p = products.find(prod => prod.nama === productName);
+  document.getElementById('calcNama').value = p.nama;
+  
+  // Ambil harga pertama sebagai patokan harga toko
+  const hargaPertama = p.harga.toString().split(',')[0].trim();
+  
+  // Jika Anda punya input harga toko (readonly), isi di sini
+  if(document.getElementById('calcHargaToko')) {
+    document.getElementById('calcHargaToko').value = Number(hargaPertama).toLocaleString();
+  }
+  
+  // Masukkan harga tersebut ke Harga Pokok secara otomatis
+  document.getElementById('calcHarga').value = hargaPertama;
+  
+  // --- TAMBAHKAN BARIS INI UNTUK MENGHILANGKAN PILIHAN ---
+  document.getElementById('calcSuggestion').innerHTML = ""; 
+  hitungEceran(); // Jalankan hitung
+}
+
+// Update fungsi resetCalc agar membersihkan field baru
+function resetCalc() {
+    document.getElementById('calcNama').value = "";
+    document.getElementById('calcHargaToko').value = ""; // Bersihkan harga toko
+    document.getElementById('calcHarga').value = "";
+    document.getElementById('calcUkuran').value = "";
+    document.getElementById('calcPotongan').value = "";
+    document.getElementById('calcUntung').value = "11";
+    document.getElementById('calcSuggestion').innerHTML = "";
+    hitungEceran();
+}
+
   function toggleInputMethod() {
   const type = document.getElementById('inputType').value;
   document.getElementById('manualInputForm').style.display = (type === 'manual') ? 'block' : 'none';
@@ -1019,7 +1197,7 @@ function addManualRow(v = "", h = "", s = "") {
       <input type="checkbox" class="form-check-input man-check" checked>
     </div>
     <div class="col-4">
-      <input type="text" class="form-control form-control-sm man-variasi" value="${v}" placeholder="Pcs/Kg">
+      <input type="text" class="form-control form-control-sm man-variasi" value='${v}'' placeholder="Pcs/Kg">
     </div>
     <div class="col-3">
       <input type="number" class="form-control form-control-sm man-harga" value="${h}" placeholder="Rp">
