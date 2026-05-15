@@ -19,11 +19,22 @@
   object-fit: cover;
   border-radius: 5px;
 }
+
 .barcode-svg {
-  max-width: 120px;
+  width: 100px;
   height: auto;
   cursor: pointer;
+  background: white;
+  padding: 5px;
+  border: 0.1px solid #eee;
+  border-radius: 1px;
 }
+
+.barcode-svg:hover {
+  border-color: #0d6efd;
+  background: #f8f9fa;
+}
+
 .table-responsive {
   background: white;
   padding: 15px;
@@ -499,8 +510,8 @@ function renderProducts(data) {
         <thead class="table-light">
           <tr>
             <th>Produk</th>
-            <th>ID / SKU</th>
-            <th>Barcode (Klik Download)</th>
+            <th>SKU</th>
+            <th>Barcode</th>
             <th class="text-end">Harga</th>
           </tr>
         </thead>
@@ -606,7 +617,7 @@ function toggleProductList() {
     renderProducts(filtered);
   }
 
-  function handleAddToCart(id) {
+function handleAddToCart(id) {
   const product = products.find(p => (p.id || p.nama) === id);
   selectedProduct = product;
   document.getElementById('modalProductName').innerText = product.nama;
@@ -614,33 +625,103 @@ function toggleProductList() {
   const variations = product.variasi ? product.variasi.split(',').map(v => v.trim()) : [];
   const stocks = product.stok ? product.stok.toString().split(',').map(s => parseInt(s.trim())) : [];
   const prices = product.harga ? product.harga.toString().split(',').map(h => parseFloat(h.trim())) : [];
+  const varIds = product.id_variasi ? product.id_variasi.toString().split(',').map(id => id.trim()) : [];
   
-  if (variations.length > 1) {
-    const modalBody = document.getElementById('variationBody');
-const varIds = product.id_variasi ? product.id_variasi.toString().split(',').map(id => id.trim()) : [];
+  const modalBody = document.getElementById('variationBody');
+  
+  // Kita buat tampilan tabel di dalam modal agar rapi dengan Barcode
+  let html = `
+    <div class="table-responsive" style="grid-column: span 2;">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr style="font-size:0.75rem">
+            <th>Variasi</th>
+            <th>Barcode</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>`;
 
-modalBody.innerHTML = variations.map((v, idx) => {
-  const currentStock = stocks[idx] || 0;
-  const currentPrice = prices[idx] || prices[0] || 0;
-  const currentId = varIds[idx] || ""; // Ambil ID Variasi
+  variations.forEach((v, idx) => {
+    const currentStock = stocks[idx] || 0;
+    const currentPrice = prices[idx] || prices[0] || 0;
+    const currentId = varIds[idx] || "VAR-" + Math.floor(Math.random()*1000); // Fallback ID
 
-  return `
-    <button class="btn btn-variation ${currentStock <= 0 ? 'btn-secondary opacity-50' : 'btn-outline-primary'}" 
-      data-var-id="${currentId}" 
-      onclick="addToCart('${v}', ${currentPrice})" ${currentStock <= 0 ? 'disabled' : ''}>
-      <div class="var-name">${v}</div>
-      <div class="text-dark small">Rp ${currentPrice.toLocaleString()}</div>
-      <span class="badge bg-light text-dark border badge-stock">Stok: ${currentStock}</span>
-    </button>`;
-}).join('');
-    new bootstrap.Modal(document.getElementById('variationModal')).show();
-  } else {
-    const singlePrice = prices[0] || 0;
-    if ((stocks[0] || 0) <= 0) alert("Stok habis!");
-    else addToCart(variations[0] || "", singlePrice);
-  }
+    html += `
+      <tr>
+        <td>
+          <div class="fw-bold small">${v}</div>
+          <div class="text-primary small">Rp ${currentPrice.toLocaleString()}</div>
+          <small class="text-muted">Stok: ${currentStock}</small>
+        </td>
+        <td class="text-center">
+          <svg id="m-barcode-${idx}" class="barcode-svg" style="max-width:100px" 
+               onclick="downloadHighResBarcode('m-barcode-${idx}', '${currentId}')"></svg>
+          <div style="font-size:0.6rem; color:gray">${currentId}</div>
+        </td>
+        <td>
+          <button class="btn btn-sm ${currentStock <= 0 ? 'btn-secondary disabled' : 'btn-primary'}" 
+                  onclick="addToCart('${v}', ${currentPrice})">
+            Pilih
+          </button>
+        </td>
+      </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  modalBody.innerHTML = html;
+
+  // Render barcode setelah HTML masuk ke DOM
+  variations.forEach((v, idx) => {
+    const currentId = varIds[idx] || "VAR-" + Math.floor(Math.random()*1000);
+    JsBarcode(`#m-barcode-${idx}`, currentId, {
+      format: "CODE128",
+      width: 2,
+      height: 40,
+      displayValue: false
+    });
+  });
+
+  new bootstrap.Modal(document.getElementById('variationModal')).show();
 }
 
+function downloadHighResBarcode(svgId, fileName) {
+  const svg = document.getElementById(svgId);
+  const serializer = new XMLSerializer();
+  let source = serializer.serializeToString(svg);
+
+  // Tambahkan namespace XML jika belum ada
+  if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+
+  const img = new Image();
+  const svgBlob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+
+  img.onload = function () {
+    const canvas = document.createElement("canvas");
+    const scale = 4; // TINGKAT KEJERNIHAN: 4x lipat lebih tajam
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "white"; // Background putih agar barcode terbaca scanner
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const pngUrl = canvas.toDataURL("image/png");
+    const downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `Barcode-${fileName}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+  event.stopPropagation();
+}
 
 function addToCart(variationName, price) {
   const product = selectedProduct;
