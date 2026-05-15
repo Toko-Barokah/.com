@@ -618,7 +618,6 @@ function handleAddToCart(id) {
   
   const modalBody = document.getElementById('variationBody');
   
-  // Kita buat tampilan tabel di dalam modal agar rapi dengan Barcode
   let html = `
     <div class="table-responsive" style="grid-column: span 2;">
       <table class="table table-sm align-middle">
@@ -634,10 +633,11 @@ function handleAddToCart(id) {
   variations.forEach((v, idx) => {
     const currentStock = stocks[idx] || 0;
     const currentPrice = prices[idx] || prices[0] || 0;
-    const currentId = varIds[idx] || "VAR-" + Math.floor(Math.random()*1000); // Fallback ID
+    const currentId = varIds[idx] || "VAR-" + Math.floor(Math.random()*1000);
 
+    // Tambahkan atribut data-var-id pada elemen tr atau tombol pilih
     html += `
-      <tr>
+      <tr class="variation-row-item" data-var-id="${currentId.toString().trim()}">
         <td>
           <div class="fw-bold small">${v}</div>
           <div class="text-primary small">Rp ${currentPrice.toLocaleString()}</div>
@@ -649,7 +649,7 @@ function handleAddToCart(id) {
           <div style="font-size:0.6rem; color:gray">${currentId}</div>
         </td>
         <td>
-          <button class="btn btn-sm ${currentStock <= 0 ? 'btn-secondary disabled' : 'btn-primary'}" 
+          <button class="btn btn-sm ${currentStock <= 0 ? 'btn-secondary disabled' : 'btn-primary'} btn-select-var" 
                   onclick="addToCart('${v}', ${currentPrice})">
             Pilih
           </button>
@@ -660,7 +660,6 @@ function handleAddToCart(id) {
   html += `</tbody></table></div>`;
   modalBody.innerHTML = html;
 
-  // Render barcode setelah HTML masuk ke DOM
   variations.forEach((v, idx) => {
     const currentId = varIds[idx] || "VAR-" + Math.floor(Math.random()*1000);
     JsBarcode(`#m-barcode-${idx}`, currentId, {
@@ -1541,37 +1540,44 @@ async function openScanner() {
 }
 
 function handleScanSuccess(decodedText) {
+  // Bersihkan teks hasil scan dari spasi di awal/akhir
+  const cleanedText = decodedText.toString().trim();
+
   // Masukkan hasil ke search input
   const searchInput = document.getElementById('searchInput');
-  searchInput.value = decodedText;
+  searchInput.value = cleanedText;
   
   // Tutup scanner
   closeScanner();
   
-  // Cari produk berdasarkan ID Variasi
+  // Cari produk berdasarkan ID Variasi (Mendukung teks maupun angka murni)
   const matchedProduct = products.find(p => {
-    const ids = p.id_variasi ? p.id_variasi.toString().split(',').map(id => id.trim()) : [];
-    return ids.includes(decodedText) || p.id === decodedText;
+    const ids = p.id_variasi ? p.id_variasi.toString().split(',').map(id => id.trim().toLowerCase()) : [];
+    const mainId = p.id ? p.id.toString().trim().toLowerCase() : '';
+    
+    return ids.includes(cleanedText.toLowerCase()) || mainId === cleanedText.toLowerCase();
   });
 
   if (matchedProduct) {
-    // Jika ketemu, buka modal variasi atau langsung tambahkan
+    // Jika ketemu, buka modal variasi
     handleAddToCart(matchedProduct.id || matchedProduct.nama);
-    // Jika variasi banyak, seleksi otomatis variasi yang sesuai ID-nya
-    setTimeout(() => autoSelectVariation(decodedText), 500);
+    // Jalankan seleksi otomatis variasi berdasarkan ID/Angka yang di-scan
+    setTimeout(() => autoSelectVariation(cleanedText), 500);
   } else {
-    alert("Produk tidak ditemukan: " + decodedText);
+    alert("Produk tidak ditemukan: " + cleanedText);
     filterProducts(); // Tetap jalankan filter biasa
   }
 }
 
 function autoSelectVariation(scannedId) {
-  // Fungsi untuk menekan tombol variasi yang ID-nya cocok dengan barcode
-  const buttons = document.querySelectorAll('.btn-variation');
-  buttons.forEach(btn => {
-    // Kita perlu menyimpan ID variasi di button saat render modal (lihat update langkah 4)
-    if (btn.getAttribute('data-var-id') === scannedId) {
-      btn.click();
+  const rows = document.querySelectorAll('.variation-row-item');
+  rows.forEach(row => {
+    const varId = row.getAttribute('data-var-id');
+    if (varId && varId.toLowerCase() === scannedId.toLowerCase()) {
+      const selectButton = row.querySelector('.btn-select-var');
+      if (selectButton && !selectButton.classList.contains('disabled')) {
+        selectButton.click();
+      }
     }
   });
 }
