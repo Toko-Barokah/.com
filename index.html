@@ -452,6 +452,24 @@
   </div>
 </div>
 
+<div class="modal fade" id="buktiTransferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow border-0">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title">Bukti Transfer / QRIS</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center p-3">
+        <img id="imageBuktiView" src="" class="img-fluid rounded shadow-sm" style="max-height: 70vh; object-fit: contain;" alt="Memuat Bukti Pembayaran...">
+        <div id="noBuktiMessage" class="text-muted my-3" style="display:none;">Belum ada unggahan bukti pembayaran untuk pesanan ini.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary w-100" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 3000;">
   <div id="stockToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="d-flex">
@@ -1628,16 +1646,13 @@ async function fetchDeliveryData() {
 function renderDeliveryList(orders) {
   const listDiv = document.getElementById('deliveryList');
   if (orders.length === 0) {
-    listDiv.innerHTML = '<div class="text-center p-5 text-muted">Tidak ada pesanan.</div>';
+    listDiv.innerHTML = '<div class="text-center p-5 text-muted">Tidak ada pesanan dengan status ini.</div>';
     return;
   }
 
   listDiv.innerHTML = orders.map((o, idx) => {
-    // Memastikan hanya status pengiriman yang diproses
-    // Jika status berisi "Lunas" atau "Belum Lunas", kita tidak menampilkannya sebagai badge pengiriman
     const isPaymentStatus = (o.status === "Lunas" || o.status === "Belum Lunas");
     
-    // Warna Badge berdasarkan status logistik
     const statusColors = { 
       'Bayar': 'bg-danger', 
       'Dikemas': 'bg-warning text-dark', 
@@ -1645,24 +1660,54 @@ function renderDeliveryList(orders) {
       'Selesai': 'bg-success' 
     };
     
-    const badgeClass = statusColors[o.status] || 'bg-secondary';
+    const currentStatus = o.status || 'Bayar';
+    const badgeClass = statusColors[currentStatus] || 'bg-secondary';
+    const statusOptions = ['Bayar', 'Dikemas', 'Dikirim', 'Selesai'];
+
+    // Cek metode pembayaran transfer / qris secara case-insensitive
+    const isTransferOrQris = o.metode && (o.metode.toLowerCase() === 'qris' || o.metode.toLowerCase() === 'transfer');
     
-    // Jika statusnya adalah Lunas/Belum Lunas, tampilkan sebagai "Proses" atau sembunyikan badgenya
-    const displayStatus = isPaymentStatus ? "Menunggu" : o.status;
+    // Siapkan tombol lihat bukti jika kondisinya terpenuhi
+    const btnBuktiHtml = isTransferOrQris ? `
+      <button type="button" class="btn btn-sm btn-outline-primary fw-bold w-100 mb-2 d-flex align-items-center justify-content-center" 
+              onclick="event.stopPropagation(); viewBuktiTransfer(${historyData.indexOf(o)});">
+        <span class="material-icons" style="font-size: 16px; margin-right: 4px;">confirmation_number</span>
+        Lihat Bukti Pembayaran
+      </button>
+    ` : '';
 
     return `
-      <div class="card mb-2 border-0 shadow-sm" onclick="showReceipt(${historyData.indexOf(o)})" style="cursor:pointer">
-        <div class="card-body p-3">
+      <div class="card mb-3 border-0 shadow-sm">
+        <div class="card-body p-3" onclick="showReceipt(${historyData.indexOf(o)})" style="cursor:pointer">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <div>
               <div class="fw-bold">${o.penerima}</div>
               <small class="text-muted">${o.resi || 'No Resi -'}</small>
             </div>
-            ${!isPaymentStatus ? `<span class="badge ${badgeClass}">${displayStatus}</span>` : `<span class="badge bg-light text-muted border">Baru</span>`}
+            <span class="badge ${badgeClass}">${currentStatus}</span>
           </div>
-          <div class="d-flex justify-content-between align-items-center">
+          <div class="d-flex justify-content-between align-items-center mb-2">
             <small class="text-muted">${o.waktu}</small>
             <div class="fw-bold text-primary">Rp ${Number(o.total).toLocaleString()}</div>
+          </div>
+          <div class="mt-1 small">
+            <span class="badge bg-light text-dark border">Metode: ${o.metode}</span>
+          </div>
+        </div>
+        <div class="card-footer bg-white border-top-0 pt-0 px-3 pb-3">
+          ${btnBuktiHtml}
+          <small class="text-muted d-block mb-2 fw-bold" style="font-size:0.7rem;">UBAH STATUS LOGISTIK:</small>
+          <div class="btn-group btn-group-sm w-100" role="group" onclick="event.stopPropagation();">
+            ${statusOptions.map(opt => {
+              const isActive = currentStatus.toLowerCase() === opt.toLowerCase();
+              const btnClass = isActive ? 'btn-primary active' : 'btn-outline-secondary';
+              return `
+                <button type="button" class="btn btn-sm ${btnClass}" style="font-size: 0.7rem; padding: 4px 2px;"
+                        onclick="updateDeliveryStatus('${o.resi}', '${opt}', this)">
+                  ${opt}
+                </button>
+              `;
+            }).join('')}
           </div>
         </div>
       </div>
@@ -1670,6 +1715,58 @@ function renderDeliveryList(orders) {
   }).join('');
 }
 
+// Fungsi Baru untuk Mengirim Update Status ke Backend (Google Apps Script)
+async function updateDeliveryStatus(resi, newStatus, buttonElement) {
+  if (!resi || resi === "No Resi -") {
+    alert("Nomor Resi tidak valid, tidak bisa mengubah status!");
+    return;
+  }
+  
+  if (!confirm(`Apakah Anda yakin ingin mengubah status resi ${resi} menjadi [${newStatus}]?`)) {
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const payload = {
+      action: "updateOrderStatus",
+      data: {
+        resi: resi,
+        status: newStatus
+      }
+    };
+
+    const response = await fetch(WEB_APP_URL, { 
+      method: "POST", 
+      body: JSON.stringify(payload) 
+    });
+    
+    const result = await response.json();
+    
+    if (result.status === "success") {
+      alert(`Status Berhasil Diperbarui ke [${newStatus}]`);
+      
+      // Ambil elemen filter aktif saat ini
+      const activeFilterBtn = document.querySelector('#deliveryFilters .btn.active');
+      const currentActiveFilter = activeFilterBtn ? activeFilterBtn.innerText.trim() : 'Bayar';
+      
+      // Segera update historyData lokal agar visual berpindah otomatis sesuai layout filter
+      const localIndex = historyData.findIndex(item => item.resi === resi);
+      if (localIndex !== -1) {
+        historyData[localIndex].status = newStatus;
+      }
+      
+      // Segarkan tampilan layout frontend berdasarkan filter yang sedang aktif
+      filterDelivery(currentActiveFilter, activeFilterBtn);
+    } else {
+      alert("Gagal memperbarui status: " + result.message);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Terjadi kesalahan koneksi saat mengirim data status.");
+  }
+  showLoading(false);
+}
 
 function filterDelivery(status, btn) {
   // Update UI Tombol Aktif
@@ -1682,6 +1779,26 @@ function filterDelivery(status, btn) {
   );
   
   renderDeliveryList(filtered);
+}
+
+function viewBuktiTransfer(globalIndex) {
+  const order = historyData[globalIndex];
+  const imgElement = document.getElementById('imageBuktiView');
+  const noMessage = document.getElementById('noBuktiMessage');
+
+  // Bersihkan link kosong atau strip bawaan sheet
+  if (order.bukti && order.bukti !== "-" && order.bukti.trim() !== "") {
+    imgElement.src = order.bukti;
+    imgElement.style.display = "block";
+    noMessage.style.display = "none";
+  } else {
+    imgElement.src = "";
+    imgElement.style.display = "none";
+    noMessage.style.display = "block";
+  }
+
+  // Tampilkan Modal Bukti Transfer
+  new bootstrap.Modal(document.getElementById('buktiTransferModal')).show();
 }
 
 </script>
