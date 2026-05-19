@@ -131,7 +131,7 @@
 
 /* Batasi tampilan produk agar hanya 1 baris (sekitar 180-200px) */
 #productGrid {
-  max-height: 130px; 
+  max-height: 90px; 
   overflow: hidden;
   transition: max-height 0.2s ease-out;
 }
@@ -147,37 +147,6 @@
   margin-top: 5px;
   margin-bottom: 20px;
 }
-
-    /* Style untuk Badge Notifikasi Navigasi */
-    .nav-item-container {
-      position: relative;
-      display: inline-block;
-    }
-    .nav-badge {
-      position: absolute;
-      top: -4px;
-      right: -8px;
-      background-color: #dc3545; /* Merah */
-      color: white;
-      font-size: 0.65rem;
-      font-weight: bold;
-      border-radius: 50%;
-      padding: 2px 6px;
-      min-width: 18px;
-      height: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
-    /* Indikator Titik Hijau/Biru untuk pesan baru di list chat */
-    .unread-dot {
-      width: 10px;
-      height: 10px;
-      background-color: #0d6efd;
-      border-radius: 50%;
-      display: inline-block;
-    }
 
   </style>
 </head>
@@ -486,10 +455,7 @@
     <span>Kalkulator</span>
   </div>
   <div class="nav-item" onclick="switchPage('chatAdmin', this)">
-    <div class="nav-item-container">
-      <span class="material-icons">forum</span>
-      <span class="nav-badge" id="chatNavBadge" style="display: none;">0</span>
-    </div>
+    <span class="material-icons">forum</span>
     <span>Chat Admin</span>
   </div>
   <div class="nav-item" onclick="switchPage('transaksi', this)">
@@ -566,13 +532,7 @@
   let finalTotal = 0;
   let selectedProduct = null;
 
-    window.onload = () => {
-    fetchProducts();
-    addManualRow(); 
-    
-    setInterval(checkGlobalUnreadChats, 5000);
-    checkGlobalUnreadChats(); 
-  };
+  window.onload = () => fetchProducts();
 
   function switchPage(pageId, el) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1434,13 +1394,11 @@ function fillManualForm(productName) {
   });
 }
 
-  window.onload = () => {
-    fetchProducts();
-    addManualRow(); 
-    
-    setInterval(checkGlobalUnreadChats, 5000);
-    checkGlobalUnreadChats(); 
-  };
+// Tambahkan di dalam window.onload
+window.onload = () => {
+  fetchProducts();
+  addManualRow(); // Memunculkan baris pertama otomatis saat start
+};
 
 function addManualRow(v = "", h = "", s = "") {
   const container = document.getElementById('manualRowsContainer');
@@ -1922,49 +1880,45 @@ function viewBuktiTransfer(globalIndex) {
     }
   }
 
+  // FETCH DAFTAR PELANGGAN YANG PERNAH CHAT
   async function fetchAdminChatList() {
-  try {
-    const response = await fetch(WEB_APP_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "getAdminChatList" })
-    });
-    const chatList = await response.json();
-    const listDiv = document.getElementById('adminChatList');
-    
-    if (chatList.length === 0) {
-      listDiv.innerHTML = '<div class="text-center p-4 text-muted small">Belum ada chat masuk.</div>';
-      return;
-    }
-    
-    const currentScroll = listDiv.scrollTop;
-
-    listDiv.innerHTML = chatList.map(c => {
-      const isActive = c.chatId === activeChatId ? 'active' : '';
+    try {
+      const response = await fetch(WEB_APP_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "getAdminChatList" })
+      });
+      const chatList = await response.json();
+      const listDiv = document.getElementById('adminChatList');
       
-      // PERUBAHAN: Jika chatId sama dengan activeChatId, isUnread dipaksa FALSE (titik biru hilang permanen)
-      const isUnread = (c.isPelangganLast || (!c.adminMessage && c.lastMessage)) && c.chatId !== activeChatId;
-      const unreadDotHtml = isUnread ? `<span class="unread-dot ms-2"></span>` : '';
+      if (chatList.length === 0) {
+        listDiv.innerHTML = '<div class="text-center p-4 text-muted small">Belum ada chat masuk.</div>';
+        return;
+      }
+      
+      // Simpan posisi scroll sebelum render ulang
+      const currentScroll = listDiv.scrollTop;
 
-      return `
-        <button type="button" class="list-group-item list-group-item-action ${isActive} p-3" 
-                onclick="fetchAdminMessages('${c.chatId}', '${c.email}', true)">
-          <div class="d-flex w-100 justify-content-between align-items-center">
-            <h6 class="mb-1 text-truncate fw-bold d-flex align-items-center" style="max-width: 70%; font-size:0.85rem;">
-              ${c.email} ${unreadDotHtml}
-            </h6>
-            <small style="font-size: 0.65rem;">${c.waktu}</small>
-          </div>
-          <p class="mb-0 text-truncate small ${isActive ? 'text-white-50' : 'text-muted'}" style="font-size:0.75rem;">
-            ${c.lastMessage}
-          </p>
-        </button>
-      `;
-    }).join('');
-    
-    listDiv.scrollTop = currentScroll;
-  } catch(e) { console.error("Gagal load chat list", e); }
-}
+      listDiv.innerHTML = chatList.map(c => {
+        const isActive = c.chatId === activeChatId ? 'active' : '';
+        return `
+          <button type="button" class="list-group-item list-group-item-action ${isActive} p-3" 
+                  onclick="fetchAdminMessages('${c.chatId}', '${c.email}', true)">
+            <div class="d-flex w-100 justify-content-between align-items-center">
+              <h6 class="mb-1 text-truncate fw-bold" style="max-width: 70%; font-size:0.85rem;">${c.email}</h6>
+              <small style="font-size: 0.65rem;">${c.waktu}</small>
+            </div>
+            <p class="mb-0 text-truncate small ${isActive ? 'text-white-50' : 'text-muted'}" style="font-size:0.75rem;">
+              ${c.lastMessage}
+            </p>
+          </button>
+        `;
+      }).join('');
+      
+      listDiv.scrollTop = currentScroll;
+    } catch(e) { console.error("Gagal load chat list", e); }
+  }
 
+  // FETCH ISI CHAT BERDASARKAN ROOM YANG DIPILIH
   async function fetchAdminMessages(chatId, email, triggerLoading) {
     activeChatId = chatId;
     activeChatEmail = email;
@@ -1976,17 +1930,6 @@ function viewBuktiTransfer(globalIndex) {
     if(triggerLoading) bodyDiv.innerHTML = '<div class="text-center pt-5 text-muted small">Memuat pesan...</div>';
     
     try {
-      // --- TAMBAHAN BARU: Kirim perintah ke Backend untuk mengubah status menjadi TERBACA ---
-      fetch(WEB_APP_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "markAsRead", data: { chatId: chatId } })
-      }).then(() => {
-        // Refresh list samping & counter agar langsung sinkron tanpa menunggu interval
-        fetchAdminChatList();
-        checkGlobalUnreadChats();
-      }).catch(e => console.error("Gagal update status baca", e));
-      // --- END TAMBAHAN BARU ---
-
       const response = await fetch(WEB_APP_URL, {
         method: "POST",
         body: JSON.stringify({ action: "getAdminMessages", data: { chatId: chatId } })
@@ -1994,6 +1937,7 @@ function viewBuktiTransfer(globalIndex) {
       const messages = await response.json();
       
       let htmlContent = messages.map(m => {
+        // Cek pengirim (Jika kolom admin terisi, berarti dari admin, sebaliknya dari pelanggan)
         const isAdmin = m.admin && m.admin !== "";
         const textContent = isAdmin ? m.admin : m.pelanggan;
         const bgClass = isAdmin ? 'bg-primary text-white ms-auto' : 'bg-white text-dark border';
@@ -2011,6 +1955,7 @@ function viewBuktiTransfer(globalIndex) {
       
       bodyDiv.innerHTML = htmlContent;
       
+      // Auto scroll ke pesan paling bawah jika ada aktivitas baru
       if(triggerLoading || bodyDiv.dataset.shouldScroll === "true" || bodyDiv.scrollTop + bodyDiv.clientHeight >= bodyDiv.scrollHeight - 100) {
         bodyDiv.scrollTop = bodyDiv.scrollHeight;
       }
@@ -2048,36 +1993,6 @@ function viewBuktiTransfer(globalIndex) {
       alert("Gagal mengirim balasan chat.");
     }
   }
-
-async function checkGlobalUnreadChats() {
-  try {
-    const response = await fetch(WEB_APP_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "getAdminChatList" })
-    });
-    const chatList = await response.json();
-    
-    let unreadCount = 0;
-    
-    chatList.forEach(c => {
-      // PERUBAHAN: Jika room chat sedang aktif dibuka admin (c.chatId === activeChatId), 
-      // jangan masukkan ke dalam hitungan badge notifikasi (anggap sudah dibaca)
-      if (c.chatId !== activeChatId) {
-        if (c.isPelangganLast || (!c.adminMessage && c.lastMessage)) { 
-          unreadCount++; 
-        }
-      }
-    });
-
-    const badge = document.getElementById('chatNavBadge');
-    if (unreadCount > 0) {
-      badge.innerText = unreadCount;
-      badge.style.display = 'flex';
-    } else {
-      badge.style.display = 'none';
-    }
-  } catch(e) { console.error("Gagal memeriksa notifikasi chat baru", e); }
-}
 
 </script>
 </body>
