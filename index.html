@@ -178,10 +178,74 @@
       border-radius: 50%;
       display: inline-block;
     }
+  
+  /* MODAL PIN LOCKSCREEN STYLE */
+#pinLockOverlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(248, 249, 250, 0.85); backdrop-filter: blur(15px);
+  z-index: 99999; display: flex; justify-content: center; align-items: center;
+}
+.pin-card {
+  background: white; padding: 30px; border-radius: 24px;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 100%; max-width: 360px; text-align: center;
+}
+.pin-dots { display: flex; justify-content: center; gap: 15px; margin: 25px 0; }
+.pin-dot {
+  width: 16px; height: 16px; border: 2px solid #0d6efd; border-radius: 50%;
+  transition: all 0.2s ease;
+}
+.pin-dot.active { background-color: #0d6efd; transform: scale(1.15); }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 10px; }
+.num-btn {
+  background: #f1f3f5; border: none; font-size: 1.5rem; font-weight: 600;
+  color: #212529; height: 65px; border-radius: 50%; display: flex;
+  justify-content: center; align-items: center; transition: all 0.15s ease;
+  cursor: pointer; user-select: none;
+}
+.num-btn:active { background: #e2e6ea; transform: scale(0.92); }
+.num-btn.action-btn { background: none; font-size: 1.1rem; color: #495057; }
+.num-btn.action-btn:active { background: #f1f3f5; }
 
   </style>
 </head>
 <body>
+
+<!-- SCREEN LOCK PIN MODERN -->
+<div id="pinLockOverlay">
+  <div class="pin-card animate__animated animate__fadeInUp">
+    <div class="mb-2">
+      <span class="material-icons text-primary" style="font-size: 48px;">lock</span>
+    </div>
+    <h5 class="fw-bold mb-1" style="color:#212529;">Verifikasi Akses</h5>
+    <p class="text-muted small">Masukkan PIN Keamanan untuk Membuka Dashboard Kasir</p>
+    
+    <div class="pin-dots">
+      <div class="pin-dot" id="dot-0"></div>
+      <div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div>
+      <div class="pin-dot" id="dot-3"></div>
+      <div class="pin-dot" id="dot-4"></div>
+      <div class="pin-dot" id="dot-5"></div>
+      <div class="pin-dot" id="dot-6"></div>
+      <div class="pin-dot" id="dot-7"></div>
+    </div>
+    
+    <div class="numpad">
+      <button class="num-btn" onclick="pressPin('1')">1</button>
+      <button class="num-btn" onclick="pressPin('2')">2</button>
+      <button class="num-btn" onclick="pressPin('3')">3</button>
+      <button class="num-btn" onclick="pressPin('4')">4</button>
+      <button class="num-btn" onclick="pressPin('5')">5</button>
+      <button class="num-btn" onclick="pressPin('6')">6</button>
+      <button class="num-btn" onclick="pressPin('7')">7</button>
+      <button class="num-btn" onclick="pressPin('8')">8</button>
+      <button class="num-btn" onclick="pressPin('9')">9</button>
+      <button class="num-btn action-btn text-danger" onclick="clearPin()">C</button>
+      <button class="num-btn" onclick="pressPin('0')">0</button>
+      <button class="num-btn action-btn text-primary" onclick="backspacePin()"><span class="material-icons">backspace</span></button>
+    </div>
+  </div>
+</div>
 
 <div id="loading">
   <div class="spinner-border text-primary" role="status"></div>
@@ -2077,6 +2141,79 @@ async function checkGlobalUnreadChats() {
       badge.style.display = 'none';
     }
   } catch(e) { console.error("Gagal memeriksa notifikasi chat baru", e); }
+}
+
+let currentPinInput = "";
+const MAX_PIN_LENGTH = 8;
+
+// Modifikasi window.onload Anda yang sudah ada agar mengecek PIN terlebih dahulu
+window.onload = () => {
+  checkSessionPin();
+};
+
+function checkSessionPin() {
+  const isVerified = sessionStorage.getItem("admin_verified");
+  if (isVerified === "true") {
+    document.getElementById("pinLockOverlay").style.display = "none";
+    // Panggil fungsi inisialisasi aplikasi Anda di sini (misal: fetchProducts())
+    if (typeof fetchProducts === "function") fetchProducts();
+  } else {
+    document.getElementById("pinLockOverlay").style.display = "flex";
+  }
+}
+
+function pressPin(num) {
+  if (currentPinInput.length < MAX_PIN_LENGTH) {
+    currentPinInput += num;
+    updatePinDots();
+    if (currentPinInput.length === MAX_PIN_LENGTH) {
+      setTimeout(submitPinVerification, 200);
+    }
+  }
+}
+
+function clearPin() {
+  currentPinInput = "";
+  updatePinDots();
+}
+
+function backspacePin() {
+  currentPinInput = currentPinInput.slice(0, -1);
+  updatePinDots();
+}
+
+function updatePinDots() {
+  for (let i = 0; i < MAX_PIN_LENGTH; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    if (i < currentPinInput.length) {
+      dot.classList.add("active");
+    } else {
+      dot.classList.remove("active");
+    }
+  }
+}
+
+async function submitPinVerification() {
+  showLoading(true);
+  try {
+    const response = await fetch(WEB_APP_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "verifyPin", data: { pin: currentPinInput } })
+    });
+    const result = await response.json();
+    if (result.status === "success") {
+      sessionStorage.setItem("admin_verified", "true");
+      document.getElementById("pinLockOverlay").style.display = "none";
+      if (typeof initializeApp === "function") { initializeApp(); } else if (typeof fetchProducts === "function") { fetchProducts(); }
+    } else {
+      alert(result.message);
+      clearPin();
+    }
+  } catch (e) {
+    alert("Gagal terhubung ke database server!");
+    clearPin();
+  }
+  showLoading(false);
 }
 
 </script>
